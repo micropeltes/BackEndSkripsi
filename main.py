@@ -1,15 +1,20 @@
 from fastapi import FastAPI
-from contextlib import asynccontextmanager
 from api import router
 from mqttsub import start_mqtt
+from database import save_data
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Startup
-    start_mqtt()
-    yield
-    # Shutdown (kalau perlu cleanup bisa taruh di sini)
-
-app = FastAPI(lifespan=lifespan)
+app = FastAPI()
 
 app.include_router(router)
+
+
+@app.on_event("startup")
+def startup():
+
+    print("Starting backend...")
+
+    # cek database
+    save_data()
+
+    # start MQTT subscriber
+    start_mqtt()

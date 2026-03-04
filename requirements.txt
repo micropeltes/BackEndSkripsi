@@ -3,3 +3,5 @@ script activate venv
 
 script run
 python -m uvicorn main:app --reload
+
+ambil data

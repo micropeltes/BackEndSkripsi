@@ -1,8 +1,8 @@
 import paho.mqtt.client as mqtt
 from database import save_data
 
-BROKER = "localhost"
-TOPIC = "sensor/data"
+BROKER = "broker.emqx.io"
+TOPIC = "sensor/control"
 
 def on_connect(client, userdata, flags, rc):
     print("Connected to MQTT")
