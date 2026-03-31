@@ -4,7 +4,7 @@ from database import save_data
 
 BROKER = "45.126.43.35"
 PORT = 8883
-TOPIC = "test/topic"
+TOPIC = "sensor/gas"
 
 CA_CERT = r"C:\mqtt\ca.crt"
 
@@ -17,7 +17,7 @@ def on_message(client, userdata, msg):
         payload = msg.payload.decode()
         print("Raw:", payload)
 
-        data = json.loads(payload)  # 🔥 parsing JSON
+        data = json.loads(payload)
 
         # Ambil field
         devid = data.get("DevID")
