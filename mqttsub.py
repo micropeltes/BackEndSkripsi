@@ -1,12 +1,15 @@
 import json
+import os
+
 import paho.mqtt.client as mqtt
 from database import save_data
+from config import get_required_env
 
-BROKER = "45.126.43.35"
-PORT = 8883
-TOPIC = "test/topic"
+BROKER = get_required_env("MQTT_BROKER")
+PORT = int(os.getenv("MQTT_PORT", "8883"))
+TOPIC = os.getenv("MQTT_TOPIC", "test/topic")
 
-CA_CERT = r"C:\mqtt\ca.crt"
+CA_CERT = get_required_env("MQTT_CA_CERT")
 
 def on_connect(client, userdata, flags, rc):
     print("Connected to MQTT with code:", rc)
@@ -17,9 +20,8 @@ def on_message(client, userdata, msg):
         payload = msg.payload.decode()
         print("Raw:", payload)
 
-        data = json.loads(payload)  # 🔥 parsing JSON
+        data = json.loads(payload)
 
-        # Ambil field
         devid = data.get("DevID")
         nh3_mics = data.get("NH3_MICS")
         nh3_mems = data.get("NH3_MEMS")
@@ -28,13 +30,27 @@ def on_message(client, userdata, msg):
         co = data.get("CO")
         mq135 = data.get("MQ135")
 
+        # VALIDASI PENTING
+        if devid is None:
+            print("Invalid data: DevID missing")
+            return
+
         print("Parsed:", data)
 
-        # Simpan ke DB
-        save_data(devid, nh3_mics, nh3_mems, h2s, no2, co, mq135)
+        save_data(
+            devid,
+            nh3_mics,
+            nh3_mems,
+            h2s,
+            no2,
+            co,
+            mq135
+        )
 
+    except json.JSONDecodeError:
+        print("Invalid JSON format")
     except Exception as e:
-        print("Error parsing message:", e)
+        print("Error:", e)
 
 def start_mqtt():
     client = mqtt.Client()
