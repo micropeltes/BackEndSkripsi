@@ -1,8 +1,10 @@
 import os
 
 from sqlalchemy import create_engine
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import sessionmaker
 from config import load_dotenv
+from models import Base, SensorData
 
 load_dotenv()
 
@@ -19,9 +21,35 @@ SessionLocal = sessionmaker(
     bind=engine
 )
 
-def save_data(value):
+def init_db():
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("Database initialized successfully.")
+        return True
+    except SQLAlchemyError as exc:
+        print(f"Database initialization failed: {exc}")
+        return False
+
+
+def save_data(device_id, nh3_mics, nh3_mems, h2s, no2, co, mq135):
     db = SessionLocal()
 
-    print("Saving to DB:", value)
-
-    db.close()
+    try:
+        sensor_data = SensorData(
+            device_id=device_id,
+            nh3_mics=nh3_mics,
+            nh3_mems=nh3_mems,
+            h2s=h2s,
+            no2=no2,
+            co=co,
+            mq135=mq135,
+        )
+        db.add(sensor_data)
+        db.commit()
+        db.refresh(sensor_data)
+        print("Saved to DB:", sensor_data.id)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        print(f"Failed to save data: {exc}")
+    finally:
+        db.close()

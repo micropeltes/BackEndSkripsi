@@ -9,8 +9,13 @@ from mqttsub import start_mqtt
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     print("Starting backend...")
-    init_db()
-    start_mqtt()
+    db_ready = init_db()
+
+    if db_ready:
+        start_mqtt()
+    else:
+        print("Skipping MQTT startup because the database is unavailable. Check DATABASE_URL in .env.")
+
     yield
     print("Shutting down backend...")
 
