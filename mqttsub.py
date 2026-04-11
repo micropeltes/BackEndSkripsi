@@ -22,17 +22,17 @@ def on_message(client, userdata, msg):
 
         data = json.loads(payload)
 
-        devid = data.get("DevID")
-        nh3_mics = data.get("NH3_MICS")
-        nh3_mems = data.get("NH3_MEMS")
-        h2s = data.get("H2S")
-        no2 = data.get("NO2")
-        co = data.get("CO")
-        mq135 = data.get("MQ135")
+        devid = data.get("devid")
+        nh3_mics = data.get("nh3_mics", data.get("NH3_MICS"))
+        nh3_mems = data.get("nh3_mems", data.get("NH3_MEMS"))
+        h2s = data.get("h2s", data.get("H2S"))
+        no2 = data.get("no2", data.get("NO2"))
+        co = data.get("co", data.get("CO"))
+        mq135 = data.get("mq135", data.get("MQ135"))
 
         # VALIDASI PENTING
         if devid is None:
-            print("Invalid data: DevID missing")
+            print("Invalid data: devid missing")
             return
 
         print("Parsed:", data)
