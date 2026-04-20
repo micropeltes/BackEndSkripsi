@@ -9,7 +9,7 @@ router = APIRouter()
 
 @router.get("/data")
 def get_data(
-    limit: int = Query(default=10, ge=1, le=100),
+    limit: int = Query(default=10, ge=1),
     device_id: str | None = None,
     db: Session = Depends(get_db),
 ):
