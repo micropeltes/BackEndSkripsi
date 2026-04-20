@@ -1,5 +1,10 @@
 import os
+import re
 from pathlib import Path
+
+ALLOWED_KEYS = {"DB_URL", "API_KEY", "SECRET_KEY"}
+BLOCKED_KEYS = {"PATH", "LD_PRELOAD", "PYTHONPATH"}
+SAFE_VALUE = re.compile(r"^[a-zA-Z0-9_\-.:/@]+$")
 
 
 def load_dotenv(dotenv_path: str = ".env") -> None:
@@ -13,14 +18,16 @@ def load_dotenv(dotenv_path: str = ".env") -> None:
             continue
 
         key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip())
+        key = key.strip()
+        value = value.strip()
 
+        if key in BLOCKED_KEYS:
+            continue
 
-load_dotenv()
+        if key not in ALLOWED_KEYS:
+            continue
 
+        if not SAFE_VALUE.match(value):
+            continue
 
-def get_required_env(name: str) -> str:
-    value = os.getenv(name)
-    if not value:
-        raise RuntimeError(f"{name} is not set in the environment.")
-    return value
+        os.environ.setdefault(key, value)
