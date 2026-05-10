@@ -1,7 +1,4 @@
-script activate venv 
-.\.venv\Scripts\activate
-
-script run
-python -m uvicorn main:app --reload
-
-ambil data
+fastapi
+uvicorn
+sqlalchemy
+paho-mqtt
