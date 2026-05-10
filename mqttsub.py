@@ -10,7 +10,9 @@ from config import get_required_env
 
 BROKER = get_required_env("MQTT_BROKER")
 PORT = int(os.getenv("MQTT_PORT", "8883"))
-TOPIC = os.getenv("MQTT_TOPIC", "device/timestmap")
+SENSOR_TOPIC = os.getenv("MQTT_SENSOR_TOPIC", "test/topic")
+TIMESTAMP_TOPIC = os.getenv("MQTT_TIMESTAMP_TOPIC", "device/timestmap")
+LEGACY_TOPIC = os.getenv("MQTT_TOPIC")
 
 CA_CERT = get_required_env("MQTT_CA_CERT")
 
@@ -18,6 +20,9 @@ NTP_SERVER = os.getenv("NTP_SERVER", "time.google")
 NTP_PORT = 123
 NTP_TIMEOUT = float(os.getenv("NTP_TIMEOUT", "2"))
 NTP_DELTA = 2208988800  # NTP epoch (1900) to Unix epoch (1970)
+
+# Menyimpan timestamp per device dari topic timestamp terpisah.
+DEVICE_TIMESTAMP_CACHE = {}
 
 
 def get_ntp_unix_time() -> float:
@@ -43,15 +48,34 @@ def to_seconds(timestamp_value) -> float:
 
 def on_connect(client, userdata, flags, rc):
     print("Connected to MQTT with code:", rc)
-    client.subscribe(TOPIC)
+    topics = [(SENSOR_TOPIC, 0), (TIMESTAMP_TOPIC, 0)]
+    if LEGACY_TOPIC:
+        topics.append((LEGACY_TOPIC, 0))
+    client.subscribe(topics)
+    print("Subscribed topics:", ", ".join(topic for topic, _ in topics))
 
 def on_message(client, userdata, msg):
     try:
         payload = msg.payload.decode()
-        print("Raw:", payload)
+        print(f"Raw [{msg.topic}]:", payload)
 
         data = json.loads(payload)
-        msg_ts = data.get("timestamp")
+        devid = data.get("devid")
+
+        if devid is None:
+            print("Invalid data: devid missing")
+            return
+
+        if msg.topic == TIMESTAMP_TOPIC:
+            msg_ts = data.get("timestamp")
+            if msg_ts is None:
+                print("Timestamp topic payload missing timestamp")
+                return
+            DEVICE_TIMESTAMP_CACHE[devid] = msg_ts
+            print(f"Cached timestamp for {devid}: {msg_ts}")
+            return
+
+        msg_ts = data.get("timestamp", DEVICE_TIMESTAMP_CACHE.get(devid))
 
         received_ts_ms = None
         device_ts_ms = None
@@ -74,7 +98,6 @@ def on_message(client, userdata, msg):
                 f"(receive={now_ntp:.3f}, device_ts={device_ts_seconds:.3f})"
             )
 
-        devid = data.get("devid")
         nh3_mics = data.get("nh3_mics", data.get("NH3_MICS"))
         nh3_mems = data.get("nh3_mems", data.get("NH3_MEMS"))
         h2s = data.get("h2s", data.get("H2S"))
@@ -82,10 +105,6 @@ def on_message(client, userdata, msg):
         co = data.get("co", data.get("CO"))
         mq135 = data.get("mq135", data.get("MQ135"))
 
-        # VALIDASI PENTING
-        if devid is None:
-            print("Invalid data: devid missing")
-            return
         if msg_ts is None:
             print("Timestamp missing; delay calculation skipped.")
 
