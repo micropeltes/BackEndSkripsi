@@ -16,6 +16,7 @@ class SensorProcessedResponse(BaseModel):
     ratio: float
     ppm: float
     unit: str = "ppm"
+    created_at: datetime | None = None
 
 
 class SensorReadingRecordResponse(SensorProcessedResponse):
@@ -23,7 +24,7 @@ class SensorReadingRecordResponse(SensorProcessedResponse):
     temperature_c: float | None = None
     humidity_pct: float | None = None
     payload_timestamp_ms: int | None = None
-    received_timestamp_ms: int
+    received_timestamp_ms: int | None = None
     created_at: datetime
 
 
