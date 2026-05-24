@@ -1,7 +1,11 @@
-script activate venv 
+﻿activate venv
 .\.venv\Scripts\activate
 
-script run
+run backend
 python -m uvicorn main:app --reload
 
-ambil data
+health
+GET http://127.0.0.1:8000/health
+
+latest processed mq135
+GET http://127.0.0.1:8000/api/v1/sensors/mq135/latest?device_id=esp32c3-01
