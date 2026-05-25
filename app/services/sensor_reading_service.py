@@ -49,6 +49,29 @@ class SensorReadingService:
             raise NotFoundError("No reading found.")
         return row
 
+    def get_latest_rows(
+        self,
+        *,
+        limit: int,
+        device_id: str | None = None,
+    ) -> list[SensorData]:
+        query = self.db.query(SensorData)
+        if device_id:
+            query = query.filter(SensorData.device_id == device_id)
+
+        rows = (
+            query.order_by(SensorData.created_at.desc(), SensorData.id.desc())
+            .limit(limit)
+            .all()
+        )
+
+        if not rows:
+            if device_id:
+                raise NotFoundError(f"No readings found for device '{device_id}'.")
+            raise NotFoundError("No readings found.")
+
+        return rows
+
     def get_adc_by_sensor(
         self,
         *,

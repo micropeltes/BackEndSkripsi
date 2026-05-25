@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Path, Query
 
 from app.converters.registry import SensorConverterRegistry
 from app.core.config import Settings
@@ -14,6 +14,8 @@ from app.core.dependencies import (
 )
 from app.schemas.sensor import (
     SensorConvertRequest,
+    SensorDataListResponse,
+    SensorDataRecordResponse,
     SensorListResponse,
     SensorProcessedResponse,
     SensorReadingRecordResponse,
@@ -154,6 +156,30 @@ def list_latest_sensor_data(
         )
 
     return SensorListResponse(count=len(items), items=items)
+
+
+@router.get("/latest/{limit}", response_model=SensorDataListResponse)
+def list_latest_sensor_rows(
+    limit: int = Path(ge=1, le=1000),
+    device_id: str | None = Query(default=None, min_length=1, max_length=64),
+    reading_service: SensorReadingService = Depends(get_sensor_reading_service),
+) -> SensorDataListResponse:
+    rows = reading_service.get_latest_rows(limit=limit, device_id=device_id)
+    items = [
+        SensorDataRecordResponse(
+            id=row.id,
+            device_id=row.device_id,
+            nh3_mics=row.nh3_mics,
+            nh3_mems=row.nh3_mems,
+            h2s=row.h2s,
+            no2=row.no2,
+            co=row.co,
+            mq135=row.mq135,
+            created_at=row.created_at,
+        )
+        for row in rows
+    ]
+    return SensorDataListResponse(count=len(items), items=items)
 
 
 @router.post("/convert", response_model=SensorProcessedResponse)
