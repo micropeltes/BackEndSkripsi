@@ -56,3 +56,23 @@ class SensorConvertRequest(BaseModel):
     adc: int
     temperature_c: float | None = None
     humidity_pct: float | None = None
+
+class SensorHistoricalProcessedSensorData(BaseModel):
+    adc: int
+    voltage: float
+    rs: float
+    r0: float
+    ratio: float
+    ppm: float
+    unit: str
+
+class SensorHistoricalProcessedItem(BaseModel):
+    id: int
+    device_id: str
+    created_at: datetime
+    sensors: dict[str, SensorHistoricalProcessedSensorData]
+
+
+class SensorHistoricalProcessedResponse(BaseModel):
+    count: int
+    items: list[SensorHistoricalProcessedItem]

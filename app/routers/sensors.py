@@ -16,6 +16,9 @@ from app.schemas.sensor import (
     SensorConvertRequest,
     SensorDataListResponse,
     SensorDataRecordResponse,
+    SensorHistoricalProcessedItem,
+    SensorHistoricalProcessedResponse,
+    SensorHistoricalProcessedSensorData,
     SensorListResponse,
     SensorProcessedResponse,
     SensorReadingRecordResponse,
@@ -44,6 +47,7 @@ def _convert_adc_to_processed(
     calibration_service: CalibrationService,
 ) -> SensorProcessedResponse:
     converter = registry.get(sensor)
+
     calibration = calibration_service.get_effective_profile(
         sensor=sensor,
         device_id=device_id,
@@ -94,20 +98,46 @@ def _processed_to_record(
 def get_supported_sensors(
     registry: SensorConverterRegistry = Depends(get_converter_registry),
 ) -> dict[str, list[str]]:
-    return {"sensors": [sensor.value for sensor in registry.list_supported()]}
+    return {
+        "sensors": [
+            sensor.value for sensor in registry.list_supported()
+        ]
+    }
 
 
-@router.get("/{sensor}/latest", response_model=SensorProcessedResponse)
+@router.get(
+    "/{sensor}/latest",
+    response_model=SensorProcessedResponse,
+)
 def get_latest_sensor_data(
     sensor: SensorName,
-    device_id: str | None = Query(default=None, min_length=1, max_length=64),
-    reading_service: SensorReadingService = Depends(get_sensor_reading_service),
-    settings: Settings = Depends(get_settings_dependency),
-    registry: SensorConverterRegistry = Depends(get_converter_registry),
-    calibration_service: CalibrationService = Depends(get_calibration_service),
+    device_id: str | None = Query(
+        default=None,
+        min_length=1,
+        max_length=64,
+    ),
+    reading_service: SensorReadingService = Depends(
+        get_sensor_reading_service
+    ),
+    settings: Settings = Depends(
+        get_settings_dependency
+    ),
+    registry: SensorConverterRegistry = Depends(
+        get_converter_registry
+    ),
+    calibration_service: CalibrationService = Depends(
+        get_calibration_service
+    ),
 ) -> SensorProcessedResponse:
-    row = reading_service.get_latest_row(device_id=device_id)
-    adc = reading_service.get_adc_by_sensor(row=row, sensor=sensor)
+    row = reading_service.get_latest_row(
+        device_id=device_id
+    )
+
+    adc = reading_service.get_adc_by_sensor(
+        row=row,
+        sensor=sensor,
+    )
+
     return _convert_adc_to_processed(
         sensor=sensor,
         adc=adc,
@@ -119,23 +149,48 @@ def get_latest_sensor_data(
     )
 
 
-@router.get("/latest", response_model=SensorListResponse)
+@router.get(
+    "/latest",
+    response_model=SensorListResponse,
+)
 def list_latest_sensor_data(
-    device_id: str | None = Query(default=None, min_length=1, max_length=64),
+    device_id: str | None = Query(
+        default=None,
+        min_length=1,
+        max_length=64,
+    ),
     sensor: SensorName | None = None,
-    reading_service: SensorReadingService = Depends(get_sensor_reading_service),
-    settings: Settings = Depends(get_settings_dependency),
-    registry: SensorConverterRegistry = Depends(get_converter_registry),
-    calibration_service: CalibrationService = Depends(get_calibration_service),
+    reading_service: SensorReadingService = Depends(
+        get_sensor_reading_service
+    ),
+    settings: Settings = Depends(
+        get_settings_dependency
+    ),
+    registry: SensorConverterRegistry = Depends(
+        get_converter_registry
+    ),
+    calibration_service: CalibrationService = Depends(
+        get_calibration_service
+    ),
 ) -> SensorListResponse:
-    row = reading_service.get_latest_row(device_id=device_id)
+    row = reading_service.get_latest_row(
+        device_id=device_id
+    )
 
-    sensors = [sensor] if sensor is not None else registry.list_supported()
+    sensors = (
+        [sensor]
+        if sensor is not None
+        else registry.list_supported()
+    )
+
     items: list[SensorReadingRecordResponse] = []
 
     for sensor_name in sensors:
         try:
-            adc = reading_service.get_adc_by_sensor(row=row, sensor=sensor_name)
+            adc = reading_service.get_adc_by_sensor(
+                row=row,
+                sensor=sensor_name,
+            )
         except NotFoundError:
             continue
 
@@ -148,23 +203,138 @@ def list_latest_sensor_data(
             registry=registry,
             calibration_service=calibration_service,
         )
-        items.append(_processed_to_record(processed=processed, device_id=row.device_id))
+
+        items.append(
+            _processed_to_record(
+                processed=processed,
+                device_id=row.device_id,
+            )
+        )
 
     if not items:
         raise NotFoundError(
-            f"No sensor values found in latest row for device '{row.device_id}'."
+            f"No sensor values found in latest row "
+            f"for device '{row.device_id}'."
         )
 
-    return SensorListResponse(count=len(items), items=items)
+    return SensorListResponse(
+        count=len(items),
+        items=items,
+    )
 
 
-@router.get("/latest/{limit}", response_model=SensorDataListResponse)
+@router.get(
+    "/latest/{limit}",
+    response_model=SensorHistoricalProcessedResponse,
+)
 def list_latest_sensor_rows(
-    limit: int = Path(ge=1, le=1000),
-    device_id: str | None = Query(default=None, min_length=1, max_length=64),
-    reading_service: SensorReadingService = Depends(get_sensor_reading_service),
+    limit: int = Path(
+        ge=1,
+        le=1000,
+    ),
+    device_id: str | None = Query(
+        default=None,
+        min_length=1,
+        max_length=64,
+    ),
+    reading_service: SensorReadingService = Depends(
+        get_sensor_reading_service
+    ),
+    settings: Settings = Depends(
+        get_settings_dependency
+    ),
+    registry: SensorConverterRegistry = Depends(
+        get_converter_registry
+    ),
+    calibration_service: CalibrationService = Depends(
+        get_calibration_service
+    ),
+) -> SensorHistoricalProcessedResponse:
+    rows = reading_service.get_latest_rows(
+        limit=limit,
+        device_id=device_id,
+    )
+
+    items: list[SensorHistoricalProcessedItem] = []
+
+    supported_sensors = registry.list_supported()
+
+    for row in rows:
+        sensors_data: dict[
+            str,
+            SensorHistoricalProcessedSensorData,
+        ] = {}
+
+        for sensor_name in supported_sensors:
+            try:
+                adc = reading_service.get_adc_by_sensor(
+                    row=row,
+                    sensor=sensor_name,
+                )
+
+                processed = _convert_adc_to_processed(
+                    sensor=sensor_name,
+                    adc=adc,
+                    device_id=row.device_id,
+                    created_at=row.created_at,
+                    settings=settings,
+                    registry=registry,
+                    calibration_service=calibration_service,
+                )
+
+                sensors_data[sensor_name.value] = (
+                    SensorHistoricalProcessedSensorData(
+                        adc=processed.adc,
+                        voltage=processed.voltage,
+                        rs=processed.rs,
+                        r0=processed.r0,
+                        ratio=processed.ratio,
+                        ppm=processed.ppm,
+                        unit=processed.unit,
+                    )
+                )
+
+            except Exception:
+                continue
+
+        items.append(
+            SensorHistoricalProcessedItem(
+                id=row.id,
+                device_id=row.device_id,
+                created_at=row.created_at,
+                sensors=sensors_data,
+            )
+        )
+
+    return SensorHistoricalProcessedResponse(
+        count=len(items),
+        items=items,
+    )
+
+
+@router.get(
+    "/latest/{limit}/unprocessed",
+    response_model=SensorDataListResponse,
+)
+def list_latest_sensor_rows_unprocessed(
+    limit: int = Path(
+        ge=1,
+        le=1000,
+    ),
+    device_id: str | None = Query(
+        default=None,
+        min_length=1,
+        max_length=64,
+    ),
+    reading_service: SensorReadingService = Depends(
+        get_sensor_reading_service
+    ),
 ) -> SensorDataListResponse:
-    rows = reading_service.get_latest_rows(limit=limit, device_id=device_id)
+    rows = reading_service.get_latest_rows(
+        limit=limit,
+        device_id=device_id,
+    )
+
     items = [
         SensorDataRecordResponse(
             id=row.id,
@@ -179,17 +349,33 @@ def list_latest_sensor_rows(
         )
         for row in rows
     ]
-    return SensorDataListResponse(count=len(items), items=items)
+
+    return SensorDataListResponse(
+        count=len(items),
+        items=items,
+    )
 
 
-@router.post("/convert", response_model=SensorProcessedResponse)
+@router.post(
+    "/convert",
+    response_model=SensorProcessedResponse,
+)
 def convert_on_demand(
     payload: SensorConvertRequest,
-    settings: Settings = Depends(get_settings_dependency),
-    registry: SensorConverterRegistry = Depends(get_converter_registry),
-    calibration_service: CalibrationService = Depends(get_calibration_service),
+    settings: Settings = Depends(
+        get_settings_dependency
+    ),
+    registry: SensorConverterRegistry = Depends(
+        get_converter_registry
+    ),
+    calibration_service: CalibrationService = Depends(
+        get_calibration_service
+    ),
 ) -> SensorProcessedResponse:
-    converter = registry.get(payload.sensor)
+    converter = registry.get(
+        payload.sensor
+    )
+
     calibration = calibration_service.get_effective_profile(
         sensor=payload.sensor,
         device_id=payload.device_id,
