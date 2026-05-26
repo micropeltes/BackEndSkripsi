@@ -33,6 +33,7 @@ class AsyncMqttIngestionService:
         self.client = mqtt.Client(client_id=settings.mqtt_client_id)
         self.client.on_connect = self._on_connect
         self.client.on_message = self._on_message
+        self.client.on_disconnect = self._on_disconnect
 
         if settings.mqtt_ca_cert:
             self.client.tls_set(ca_certs=settings.mqtt_ca_cert)
@@ -75,17 +76,27 @@ class AsyncMqttIngestionService:
         self.client.loop_stop()
         self.client.disconnect()
 
-    def _on_connect(self, client: mqtt.Client, userdata: object, flags: dict, rc: int) -> None:
-        _ = (client, userdata, flags)
+    def _on_connect(
+        self,
+        client: mqtt.Client,
+        userdata: object,
+        flags: dict,
+        rc: int,
+        properties: object | None = None,
+    ) -> None:
+        _ = (client, userdata, flags, properties)
 
-        if rc != 0:
-            logger.error("MQTT connection failed with code %s", rc)
+        rc_value = int(rc) if isinstance(rc, int) else rc
+        if rc_value != 0:
+            logger.error("MQTT connection failed with code %s", rc_value)
             return
 
         topics: list[tuple[str, int]] = [
             (self.settings.mqtt_sensor_topic, self.settings.mqtt_qos),
             (self.settings.mqtt_timestamp_topic, self.settings.mqtt_qos),
         ]
+        if self.settings.mqtt_timestamp_topic_legacy:
+            topics.append((self.settings.mqtt_timestamp_topic_legacy, self.settings.mqtt_qos))
         if self.settings.mqtt_legacy_topic:
             topics.append((self.settings.mqtt_legacy_topic, self.settings.mqtt_qos))
 
@@ -104,7 +115,11 @@ class AsyncMqttIngestionService:
                 return
 
             topic = msg.topic
-            if topic == self.settings.mqtt_timestamp_topic:
+            is_timestamp_topic = topic == self.settings.mqtt_timestamp_topic
+            if self.settings.mqtt_timestamp_topic_legacy:
+                is_timestamp_topic = is_timestamp_topic or topic == self.settings.mqtt_timestamp_topic_legacy
+
+            if is_timestamp_topic:
                 self._cache_device_timestamp(raw_payload)
                 return
 
@@ -116,6 +131,20 @@ class AsyncMqttIngestionService:
         except Exception as exc:
             logger.exception("Failed to parse MQTT message: %s", exc)
 
+    def _on_disconnect(
+        self,
+        client: mqtt.Client,
+        userdata: object,
+        rc: int,
+        properties: object | None = None,
+    ) -> None:
+        _ = (client, userdata, properties)
+        rc_value = int(rc) if isinstance(rc, int) else rc
+        if rc_value != 0:
+            logger.warning("MQTT disconnected unexpectedly with code %s", rc_value)
+        else:
+            logger.info("MQTT disconnected cleanly")
+
     def _cache_device_timestamp(self, raw_payload: dict[str, object]) -> None:
         device_id = raw_payload.get("device_id") or raw_payload.get("devid")
         timestamp = raw_payload.get("timestamp_ms", raw_payload.get("timestamp"))
@@ -123,7 +152,11 @@ class AsyncMqttIngestionService:
             return
 
         try:
-            self._device_timestamp_cache[str(device_id)] = int(float(str(timestamp)))
+            parsed_timestamp = int(float(str(timestamp)))
+            # Accept both unix seconds and milliseconds from devices.
+            if parsed_timestamp < 1_000_000_000_000:
+                parsed_timestamp *= 1000
+            self._device_timestamp_cache[str(device_id)] = parsed_timestamp
         except ValueError:
             logger.warning("Invalid cached timestamp for device=%s", device_id)
 

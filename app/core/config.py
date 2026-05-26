@@ -64,6 +64,7 @@ class Settings(BaseModel):
     mqtt_port: int = 8883
     mqtt_sensor_topic: str = "test/topic"
     mqtt_timestamp_topic: str = "device/timestamp"
+    mqtt_timestamp_topic_legacy: str | None = "device/timestmap"
     mqtt_legacy_topic: str | None = None
     mqtt_ca_cert: str | None = None
     mqtt_username: str | None = None
@@ -105,6 +106,7 @@ class Settings(BaseModel):
             mqtt_port=int(os.getenv("MQTT_PORT", "8883")),
             mqtt_sensor_topic=os.getenv("MQTT_SENSOR_TOPIC", os.getenv("MQTT_TOPIC", "test/topic")),
             mqtt_timestamp_topic=os.getenv("MQTT_TIMESTAMP_TOPIC", "device/timestamp"),
+            mqtt_timestamp_topic_legacy=os.getenv("MQTT_TIMESTAMP_TOPIC_LEGACY", "device/timestmap"),
             mqtt_legacy_topic=os.getenv("MQTT_LEGACY_TOPIC"),
             mqtt_ca_cert=ca_cert,
             mqtt_username=os.getenv("MQTT_USERNAME"),

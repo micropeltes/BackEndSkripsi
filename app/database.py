@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+import logging
 
 from sqlalchemy import create_engine
 from sqlalchemy.exc import SQLAlchemyError
@@ -11,6 +12,7 @@ from app.models import Base
 
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 engine = create_engine(settings.database_url, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -28,5 +30,6 @@ def init_db() -> bool:
     try:
         Base.metadata.create_all(bind=engine)
         return True
-    except SQLAlchemyError:
+    except SQLAlchemyError as exc:
+        logger.exception("Database initialization error: %s", exc)
         return False

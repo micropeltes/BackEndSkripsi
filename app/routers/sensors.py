@@ -78,7 +78,7 @@ def _convert_adc_to_processed(
 def _processed_to_record(
     *,
     processed: SensorProcessedResponse,
-    device_id: str,
+    row: object,
 ) -> SensorReadingRecordResponse:
     return SensorReadingRecordResponse(
         sensor=processed.sensor,
@@ -90,7 +90,11 @@ def _processed_to_record(
         ppm=processed.ppm,
         unit=processed.unit,
         created_at=processed.created_at,
-        device_id=device_id,
+        device_id=getattr(row, "device_id"),
+        temperature_c=getattr(row, "temperature_c", None),
+        humidity_pct=getattr(row, "humidity_pct", None),
+        payload_timestamp_ms=getattr(row, "payload_timestamp_ms", None),
+        received_timestamp_ms=getattr(row, "received_timestamp_ms", None),
     )
 
 
@@ -207,7 +211,7 @@ def list_latest_sensor_data(
         items.append(
             _processed_to_record(
                 processed=processed,
-                device_id=row.device_id,
+                row=row,
             )
         )
 

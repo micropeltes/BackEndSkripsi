@@ -1,12 +1,32 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+from datetime import datetime
+
 from sqlalchemy.orm import Session
 
 from app.converters.base import ConversionResult
-from app.models import SensorData, SensorReading
+from app.models import SensorReading
 from app.schemas.mqtt import RawSensorSample
 from app.utils.errors import NotFoundError
 from app.utils.sensor_types import SensorName
+
+
+@dataclass
+class SensorSnapshot:
+    id: int
+    device_id: str
+    created_at: datetime
+    received_timestamp_ms: int
+    payload_timestamp_ms: int | None = None
+    temperature_c: float | None = None
+    humidity_pct: float | None = None
+    nh3_mics: float | None = None
+    nh3_mems: float | None = None
+    h2s: float | None = None
+    no2: float | None = None
+    co: float | None = None
+    mq135: float | None = None
 
 
 class SensorReadingService:
@@ -33,49 +53,40 @@ class SensorReadingService:
         self.db.add(reading)
         return reading
 
-    def get_latest_row(self, *, device_id: str | None = None) -> SensorData:
-        query = self.db.query(SensorData)
-        if device_id:
-            query = query.filter(SensorData.device_id == device_id)
-
-        row = (
-            query.order_by(SensorData.created_at.desc(), SensorData.id.desc())
-            .limit(1)
-            .first()
-        )
-        if row is None:
-            if device_id:
-                raise NotFoundError(f"No reading found for device '{device_id}'.")
-            raise NotFoundError("No reading found.")
-        return row
+    def get_latest_row(self, *, device_id: str | None = None) -> SensorSnapshot:
+        rows = self.get_latest_rows(limit=1, device_id=device_id)
+        return rows[0]
 
     def get_latest_rows(
         self,
         *,
         limit: int,
         device_id: str | None = None,
-    ) -> list[SensorData]:
-        query = self.db.query(SensorData)
+    ) -> list[SensorSnapshot]:
+        query = self.db.query(SensorReading)
         if device_id:
-            query = query.filter(SensorData.device_id == device_id)
+            query = query.filter(SensorReading.device_id == device_id)
 
         rows = (
-            query.order_by(SensorData.created_at.desc(), SensorData.id.desc())
-            .limit(limit)
+            query.order_by(
+                SensorReading.received_timestamp_ms.desc(),
+                SensorReading.id.desc(),
+            )
             .all()
         )
 
-        if not rows:
+        snapshots = self._build_snapshots(rows=rows, limit=limit)
+        if not snapshots:
             if device_id:
                 raise NotFoundError(f"No readings found for device '{device_id}'.")
             raise NotFoundError("No readings found.")
 
-        return rows
+        return snapshots
 
     def get_adc_by_sensor(
         self,
         *,
-        row: SensorData,
+        row: SensorSnapshot,
         sensor: SensorName,
     ) -> int:
         sensor_map: dict[SensorName, float | None] = {
@@ -98,8 +109,64 @@ class SensorReadingService:
 
         return int(round(adc_value))
 
-    def get_all_sensor_adc(self, *, row: SensorData) -> dict[SensorName, int]:
+    def get_all_sensor_adc(self, *, row: SensorSnapshot) -> dict[SensorName, int]:
         return {
             sensor: self.get_adc_by_sensor(row=row, sensor=sensor)
             for sensor in SensorName
         }
+
+    def _build_snapshots(
+        self,
+        *,
+        rows: list[SensorReading],
+        limit: int,
+    ) -> list[SensorSnapshot]:
+        snapshots: list[SensorSnapshot] = []
+        grouped: dict[tuple[str, int], SensorSnapshot] = {}
+        sensor_field_map: dict[str, str] = {
+            SensorName.MQ135.value: "mq135",
+            SensorName.NH3_MICS.value: "nh3_mics",
+            SensorName.CO.value: "co",
+            SensorName.NO2.value: "no2",
+            SensorName.FERMION_NH3.value: "nh3_mems",
+            SensorName.FERMION_H2S.value: "h2s",
+        }
+
+        for reading in rows:
+            group_key = (
+                reading.device_id,
+                reading.received_timestamp_ms,
+            )
+            snapshot = grouped.get(group_key)
+            if snapshot is None:
+                if len(snapshots) >= limit:
+                    continue
+
+                snapshot = SensorSnapshot(
+                    id=reading.id,
+                    device_id=reading.device_id,
+                    created_at=reading.created_at,
+                    received_timestamp_ms=reading.received_timestamp_ms,
+                    payload_timestamp_ms=reading.payload_timestamp_ms,
+                    temperature_c=reading.temperature_c,
+                    humidity_pct=reading.humidity_pct,
+                )
+                grouped[group_key] = snapshot
+                snapshots.append(snapshot)
+            else:
+                if reading.id > snapshot.id:
+                    snapshot.id = reading.id
+                if reading.created_at > snapshot.created_at:
+                    snapshot.created_at = reading.created_at
+                if snapshot.payload_timestamp_ms is None and reading.payload_timestamp_ms is not None:
+                    snapshot.payload_timestamp_ms = reading.payload_timestamp_ms
+                if snapshot.temperature_c is None and reading.temperature_c is not None:
+                    snapshot.temperature_c = reading.temperature_c
+                if snapshot.humidity_pct is None and reading.humidity_pct is not None:
+                    snapshot.humidity_pct = reading.humidity_pct
+
+            target_field = sensor_field_map.get(reading.sensor)
+            if target_field is not None:
+                setattr(snapshot, target_field, float(reading.adc_raw))
+
+        return snapshots
