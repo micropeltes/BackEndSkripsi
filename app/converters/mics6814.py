@@ -47,5 +47,5 @@ class NO2MICSConverter(BaseGasSensorConverter):
 
     ratio_mode = RatioMode.RS_OVER_R0
 
-    curve_a = 0.5
-    curve_b = -2.0
+    curve_a = 10.0
+    curve_b = -1.0
