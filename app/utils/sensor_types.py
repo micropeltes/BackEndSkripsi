@@ -5,9 +5,13 @@ from enum import Enum
 
 class SensorName(str, Enum):
     MQ135 = "mq135"
-    MICS6814 = "mics6814"
-    FERMION_NH3 = "fermion_nh3"
-    FERMION_H2S = "fermion_h2s"
+
+    NH3_MICS = "nh3_mics"
+    CO = "co"
+    NO2 = "no2"
+
+    FERMION_NH3 = "nh3_mems"
+    FERMION_H2S = "h2s"
 
 
 class RatioMode(str, Enum):

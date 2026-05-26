@@ -7,10 +7,14 @@ from app.utils.sensor_types import SensorName
 
 LEGACY_SENSOR_MAP: dict[str, SensorName] = {
     "mq135": SensorName.MQ135,
-    "mics6814": SensorName.MICS6814,
-    "nh3_mics": SensorName.MICS6814,
+
+    "nh3_mics": SensorName.NH3_MICS,
+    "co": SensorName.CO,
+    "no2": SensorName.NO2,
+
     "fermion_nh3": SensorName.FERMION_NH3,
     "nh3_mems": SensorName.FERMION_NH3,
+
     "fermion_h2s": SensorName.FERMION_H2S,
     "h2s": SensorName.FERMION_H2S,
 }

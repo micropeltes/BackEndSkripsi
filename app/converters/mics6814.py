@@ -4,16 +4,48 @@ from app.converters.base import BaseGasSensorConverter
 from app.utils.sensor_types import RatioMode, SensorName
 
 
-class MICS6814Converter(BaseGasSensorConverter):
+class NH3MICSConverter(BaseGasSensorConverter):
+
     @property
     def sensor_name(self) -> SensorName:
-        return SensorName.MICS6814
+        return SensorName.NH3_MICS
 
     rl_ohm = 10000.0
     vcc = 5.0
     default_r0 = 10000.0
+
     ratio_mode = RatioMode.RS_OVER_R0
 
-    # Placeholder curve for NH3-like channel; tune from calibration dataset.
+    # Placeholder curve
     curve_a = 70.0
     curve_b = -1.8
+    
+class COMICSConverter(BaseGasSensorConverter):
+
+    @property
+    def sensor_name(self) -> SensorName:
+        return SensorName.CO
+
+    rl_ohm = 10000.0
+    vcc = 5.0
+    default_r0 = 10000.0
+
+    ratio_mode = RatioMode.RS_OVER_R0
+
+    curve_a = 50.0
+    curve_b = -1.5
+    
+class NO2MICSConverter(BaseGasSensorConverter):
+
+    @property
+    def sensor_name(self) -> SensorName:
+        return SensorName.NO2
+
+    rl_ohm = 10000.0
+    vcc = 5.0
+    default_r0 = 10000.0
+
+    ratio_mode = RatioMode.RS_OVER_R0
+
+    curve_a = 0.5
+    curve_b = -2.0

@@ -82,7 +82,9 @@ class SensorReadingService:
             SensorName.MQ135: row.mq135,
             # MICS6814 has multiple channels in wide schema. We use NH3 channel
             # as the primary value for generic "mics6814" endpoint.
-            SensorName.MICS6814: row.nh3_mics,
+            SensorName.NH3_MICS: row.nh3_mics,
+            SensorName.CO: row.co,
+            SensorName.NO2: row.no2,            
             SensorName.FERMION_NH3: row.nh3_mems,
             SensorName.FERMION_H2S: row.h2s,
         }
