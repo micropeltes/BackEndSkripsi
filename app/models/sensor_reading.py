@@ -38,3 +38,5 @@ class SensorReading(Base):
 
 
 Index("ix_sensor_readings_device_sensor_created", SensorReading.device_id, SensorReading.sensor, SensorReading.created_at.desc())
+Index("ix_sensor_readings_received_id", SensorReading.received_timestamp_ms.desc(), SensorReading.id.desc())
+Index("ix_sensor_readings_device_received_id", SensorReading.device_id, SensorReading.received_timestamp_ms.desc(), SensorReading.id.desc())

@@ -58,6 +58,10 @@ class Settings(BaseModel):
     debug: bool = False
 
     database_url: str
+    db_pool_size: int = Field(default=10, ge=1)
+    db_max_overflow: int = Field(default=20, ge=0)
+    db_pool_timeout: int = Field(default=30, ge=1)
+    db_pool_recycle: int = Field(default=1800, ge=1)
 
     mqtt_enabled: bool = True
     mqtt_broker: str | None = None
@@ -101,6 +105,10 @@ class Settings(BaseModel):
         return cls(
             debug=_parse_bool("DEBUG", False),
             database_url=_required_env("DATABASE_URL"),
+            db_pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
+            db_max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "20")),
+            db_pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "30")),
+            db_pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),
             mqtt_enabled=mqtt_enabled,
             mqtt_broker=broker,
             mqtt_port=int(os.getenv("MQTT_PORT", "8883")),

@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.converters.base import ConversionResult
@@ -63,12 +64,40 @@ class SensorReadingService:
         limit: int,
         device_id: str | None = None,
     ) -> list[SensorSnapshot]:
-        query = self.db.query(SensorReading)
+        recent_groups_query = self.db.query(
+            SensorReading.device_id.label("device_id"),
+            SensorReading.received_timestamp_ms.label("received_timestamp_ms"),
+            func.max(SensorReading.id).label("max_id"),
+        )
         if device_id:
-            query = query.filter(SensorReading.device_id == device_id)
+            recent_groups_query = recent_groups_query.filter(
+                SensorReading.device_id == device_id
+            )
+
+        recent_groups = (
+            recent_groups_query.group_by(
+                SensorReading.device_id,
+                SensorReading.received_timestamp_ms,
+            )
+            .order_by(
+                SensorReading.received_timestamp_ms.desc(),
+                func.max(SensorReading.id).desc(),
+            )
+            .limit(limit)
+            .subquery()
+        )
 
         rows = (
-            query.order_by(
+            self.db.query(SensorReading)
+            .join(
+                recent_groups,
+                and_(
+                    SensorReading.device_id == recent_groups.c.device_id,
+                    SensorReading.received_timestamp_ms
+                    == recent_groups.c.received_timestamp_ms,
+                ),
+            )
+            .order_by(
                 SensorReading.received_timestamp_ms.desc(),
                 SensorReading.id.desc(),
             )
