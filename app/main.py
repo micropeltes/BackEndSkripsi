@@ -41,6 +41,8 @@ async def lifespan(app: FastAPI):
     )
 
     mqtt_ingestion: AsyncMqttIngestionService | None = None
+    app.state.mqtt_ingestion = None
+    app.state.mqtt_startup_error = None
 
     if db_ready and settings.mqtt_enabled:
         try:
@@ -57,6 +59,7 @@ async def lifespan(app: FastAPI):
             app.state.mqtt_ingestion = mqtt_ingestion
             logger.info("MQTT ingestion started")
         except Exception as exc:  # pragma: no cover - defensive startup guard
+            app.state.mqtt_startup_error = str(exc)
             logger.exception("MQTT startup failed: %s", exc)
 
     yield
