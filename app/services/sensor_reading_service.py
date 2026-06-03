@@ -7,6 +7,7 @@ from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
 
 from app.converters.base import ConversionResult
+from app.database import run_read_with_db_retry
 from app.models import SensorReading
 from app.schemas.mqtt import RawSensorSample
 from app.utils.errors import NotFoundError
@@ -87,21 +88,28 @@ class SensorReadingService:
             .subquery()
         )
 
-        rows = (
-            self.db.query(SensorReading)
-            .join(
-                recent_groups,
-                and_(
-                    SensorReading.device_id == recent_groups.c.device_id,
-                    SensorReading.received_timestamp_ms
-                    == recent_groups.c.received_timestamp_ms,
-                ),
+        def fetch_rows() -> list[SensorReading]:
+            return (
+                self.db.query(SensorReading)
+                .join(
+                    recent_groups,
+                    and_(
+                        SensorReading.device_id == recent_groups.c.device_id,
+                        SensorReading.received_timestamp_ms
+                        == recent_groups.c.received_timestamp_ms,
+                    ),
+                )
+                .order_by(
+                    SensorReading.received_timestamp_ms.desc(),
+                    SensorReading.id.desc(),
+                )
+                .all()
             )
-            .order_by(
-                SensorReading.received_timestamp_ms.desc(),
-                SensorReading.id.desc(),
-            )
-            .all()
+
+        rows = run_read_with_db_retry(
+            self.db,
+            fetch_rows,
+            operation_name="fetch latest sensor readings",
         )
 
         snapshots = self._build_snapshots(rows=rows, limit=limit)

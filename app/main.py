@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.converters.registry import SensorConverterRegistry
 from app.core.config import get_settings
@@ -88,6 +89,18 @@ async def app_error_handler(_: Request, exc: AppError) -> JSONResponse:
         content={
             "error_code": exc.error_code,
             "detail": exc.message,
+        },
+    )
+
+
+@app.exception_handler(SQLAlchemyError)
+async def database_error_handler(_: Request, exc: SQLAlchemyError) -> JSONResponse:
+    logger.exception("Database request failed: %s", exc)
+    return JSONResponse(
+        status_code=503,
+        content={
+            "error_code": "database_unavailable",
+            "detail": "Database connection is temporarily unavailable.",
         },
     )
 

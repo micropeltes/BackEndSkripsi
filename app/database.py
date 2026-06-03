@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 import logging
+from typing import TypeVar
 
 from sqlalchemy import create_engine
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
@@ -13,6 +14,15 @@ from app.models import Base
 
 settings = get_settings()
 logger = logging.getLogger(__name__)
+T = TypeVar("T")
+
+TRANSIENT_DB_ERROR_MESSAGES = (
+    "ssl connection has been closed unexpectedly",
+    "server closed the connection unexpectedly",
+    "connection already closed",
+    "connection not open",
+    "terminating connection",
+)
 
 engine_options: dict[str, object] = {
     "pool_pre_ping": True,
@@ -35,6 +45,34 @@ def get_db() -> Generator[Session, None, None]:
         yield db
     finally:
         db.close()
+
+
+def is_transient_db_error(exc: OperationalError) -> bool:
+    message = str(getattr(exc, "orig", exc)).lower()
+    return any(
+        transient_message in message
+        for transient_message in TRANSIENT_DB_ERROR_MESSAGES
+    )
+
+
+def run_read_with_db_retry(
+    db: Session,
+    operation: Callable[[], T],
+    *,
+    operation_name: str,
+) -> T:
+    try:
+        return operation()
+    except OperationalError as exc:
+        if not is_transient_db_error(exc):
+            raise
+
+        logger.warning(
+            "Transient database connection error during %s; invalidating session and retrying once",
+            operation_name,
+        )
+        db.invalidate()
+        return operation()
 
 
 def init_db() -> bool:

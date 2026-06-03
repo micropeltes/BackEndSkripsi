@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 
 from app.converters.base import CalibrationProfile
 from app.converters.registry import SensorConverterRegistry
+from app.database import run_read_with_db_retry
 from app.models import SensorCalibration
 from app.schemas.calibration import CalibrationUpsertRequest
 from app.utils.errors import NotFoundError
@@ -18,13 +19,20 @@ class CalibrationService:
     def get_effective_profile(self, *, sensor: SensorName, device_id: str) -> CalibrationProfile:
         converter = self.registry.get(sensor)
 
-        calibration = (
-            self.db.query(SensorCalibration)
-            .filter(
-                SensorCalibration.sensor == sensor.value,
-                SensorCalibration.device_id == device_id,
+        def fetch_calibration() -> SensorCalibration | None:
+            return (
+                self.db.query(SensorCalibration)
+                .filter(
+                    SensorCalibration.sensor == sensor.value,
+                    SensorCalibration.device_id == device_id,
+                )
+                .first()
             )
-            .first()
+
+        calibration = run_read_with_db_retry(
+            self.db,
+            fetch_calibration,
+            operation_name="fetch effective calibration",
         )
 
         if calibration is None:
@@ -86,13 +94,20 @@ class CalibrationService:
         return calibration
 
     def get_by_sensor_and_device(self, *, sensor: SensorName, device_id: str) -> SensorCalibration:
-        calibration = (
-            self.db.query(SensorCalibration)
-            .filter(
-                SensorCalibration.sensor == sensor.value,
-                SensorCalibration.device_id == device_id,
+        def fetch_calibration() -> SensorCalibration | None:
+            return (
+                self.db.query(SensorCalibration)
+                .filter(
+                    SensorCalibration.sensor == sensor.value,
+                    SensorCalibration.device_id == device_id,
+                )
+                .first()
             )
-            .first()
+
+        calibration = run_read_with_db_retry(
+            self.db,
+            fetch_calibration,
+            operation_name="fetch calibration by sensor and device",
         )
 
         if calibration is None:
