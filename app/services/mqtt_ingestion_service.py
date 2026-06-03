@@ -3,6 +3,8 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import queue
+import threading
 
 import paho.mqtt.client as mqtt
 
@@ -24,9 +26,9 @@ class AsyncMqttIngestionService:
         self.settings = settings
         self.pipeline_service = pipeline_service
 
-        self._queue: asyncio.Queue[MqttRawPayload] = asyncio.Queue(maxsize=settings.mqtt_queue_size)
-        self._loop: asyncio.AbstractEventLoop | None = None
-        self._worker_task: asyncio.Task[None] | None = None
+        self._queue: queue.Queue[MqttRawPayload | None] = queue.Queue(maxsize=settings.mqtt_queue_size)
+        self._stop_event = threading.Event()
+        self._worker_thread: threading.Thread | None = None
 
         self._device_timestamp_cache: dict[str, int] = {}
 
@@ -42,12 +44,12 @@ class AsyncMqttIngestionService:
         if settings.mqtt_username and settings.mqtt_password:
             self.client.username_pw_set(settings.mqtt_username, settings.mqtt_password)
 
+        self.client.reconnect_delay_set(min_delay=1, max_delay=30)
+
     async def start(self) -> None:
         if not self.settings.mqtt_enabled:
             logger.info("MQTT ingestion disabled by MQTT_ENABLED=false")
             return
-
-        self._loop = asyncio.get_running_loop()
 
         logger.info(
             "Connecting MQTT broker %s:%s topic=%s",
@@ -56,25 +58,34 @@ class AsyncMqttIngestionService:
             self.settings.mqtt_sensor_topic,
         )
 
-        self.client.connect(
+        self._stop_event.clear()
+        self._worker_thread = threading.Thread(
+            target=self._worker,
+            name="mqtt-db-worker",
+            daemon=True,
+        )
+        self._worker_thread.start()
+
+        self.client.connect_async(
             host=self.settings.mqtt_broker,
             port=self.settings.mqtt_port,
             keepalive=self.settings.mqtt_keepalive,
         )
         self.client.loop_start()
 
-        self._worker_task = asyncio.create_task(self._worker(), name="mqtt-ingestion-worker")
-
     async def stop(self) -> None:
-        if self._worker_task is not None:
-            self._worker_task.cancel()
-            try:
-                await self._worker_task
-            except asyncio.CancelledError:
-                pass
+        self._stop_event.set()
 
-        self.client.loop_stop()
         self.client.disconnect()
+        self.client.loop_stop()
+
+        if self._worker_thread is not None:
+            try:
+                self._queue.put_nowait(None)
+            except queue.Full:
+                pass
+            await asyncio.to_thread(self._worker_thread.join, 5)
+            self._worker_thread = None
 
     def _on_connect(
         self,
@@ -173,23 +184,28 @@ class AsyncMqttIngestionService:
             raw_payload["timestamp_ms"] = cached
 
     def _enqueue_payload_threadsafe(self, payload: MqttRawPayload) -> None:
-        if self._loop is None:
-            logger.warning("Ignoring MQTT payload because event loop is not ready")
+        if self._stop_event.is_set():
             return
 
-        def _enqueue() -> None:
-            if self._queue.full():
-                logger.warning("Dropping MQTT payload because queue is full")
-                return
+        try:
             self._queue.put_nowait(payload)
+        except queue.Full:
+            logger.warning("Dropping MQTT payload because queue is full")
 
-        self._loop.call_soon_threadsafe(_enqueue)
-
-    async def _worker(self) -> None:
-        while True:
-            payload = await self._queue.get()
+    def _worker(self) -> None:
+        logger.info("MQTT DB worker thread started")
+        while not self._stop_event.is_set():
             try:
-                saved = await self.pipeline_service.process_payload(payload)
+                payload = self._queue.get(timeout=1)
+            except queue.Empty:
+                continue
+
+            if payload is None:
+                self._queue.task_done()
+                break
+
+            try:
+                saved = self.pipeline_service.process_payload(payload)
                 logger.info(
                     "Processed MQTT payload | device=%s saved=%s sensors=%s",
                     payload.device_id,
@@ -200,3 +216,5 @@ class AsyncMqttIngestionService:
                 logger.exception("MQTT payload processing failed: %s", exc)
             finally:
                 self._queue.task_done()
+
+        logger.info("MQTT DB worker thread stopped")

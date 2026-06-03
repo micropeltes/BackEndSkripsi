@@ -34,7 +34,7 @@ class SensorPipelineService:
         self.raw_service = RawAcquisitionService()
         self.rolling_filter = RollingAverageFilter(window_size=settings.filter_window_size)
 
-    async def process_payload(self, payload: MqttRawPayload) -> int:
+    def process_payload(self, payload: MqttRawPayload) -> int:
         received_timestamp_ms = now_ms()
         samples = self.raw_service.explode_payload(
             payload=payload,
