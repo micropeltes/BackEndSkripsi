@@ -14,6 +14,7 @@ from app.database import SessionLocal, init_db
 from app.routers.calibration import router as calibration_router
 from app.routers.health import router as health_router
 from app.routers.sensors import router as sensors_router
+from app.converters.r0_baselines import format_active_r0_baselines
 from app.services.mqtt_ingestion_service import AsyncMqttIngestionService
 from app.services.sensor_pipeline_service import SensorPipelineService
 from app.utils.errors import AppError
@@ -32,6 +33,12 @@ async def lifespan(app: FastAPI):
     if not db_ready:
         logger.error("Database initialization failed. Check DATABASE_URL.")
 
+    registry = SensorConverterRegistry()
+    logger.info(
+        "Active calibrated R0 baselines: %s",
+        format_active_r0_baselines(registry.list_supported()),
+    )
+
     mqtt_ingestion: AsyncMqttIngestionService | None = None
 
     if db_ready and settings.mqtt_enabled:
@@ -39,7 +46,7 @@ async def lifespan(app: FastAPI):
             pipeline = SensorPipelineService(
                 settings=settings,
                 session_factory=SessionLocal,
-                registry=SensorConverterRegistry(),
+                registry=registry,
             )
             mqtt_ingestion = AsyncMqttIngestionService(
                 settings=settings,

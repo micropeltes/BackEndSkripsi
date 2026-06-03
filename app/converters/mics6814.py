@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from app.converters.base import BaseGasSensorConverter
+from app.converters.r0_baselines import get_calibrated_r0
 from app.utils.sensor_types import RatioMode, SensorName
 
 
@@ -12,7 +13,7 @@ class NH3MICSConverter(BaseGasSensorConverter):
 
     rl_ohm = 10000.0
     vcc = 5.0
-    default_r0 = 10000.0
+    default_r0 = get_calibrated_r0(SensorName.NH3_MICS)
 
     ratio_mode = RatioMode.RS_OVER_R0
 
@@ -28,7 +29,7 @@ class COMICSConverter(BaseGasSensorConverter):
 
     rl_ohm = 10000.0
     vcc = 5.0
-    default_r0 = 10000.0
+    default_r0 = get_calibrated_r0(SensorName.CO)
 
     ratio_mode = RatioMode.RS_OVER_R0
 
@@ -43,7 +44,7 @@ class NO2MICSConverter(BaseGasSensorConverter):
 
     rl_ohm = 10000.0
     vcc = 5.0
-    default_r0 = 10000.0
+    default_r0 = get_calibrated_r0(SensorName.NO2)
 
     ratio_mode = RatioMode.RS_OVER_R0
 
