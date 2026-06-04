@@ -18,8 +18,8 @@ class NH3MICSConverter(BaseGasSensorConverter):
     ratio_mode = RatioMode.RS_OVER_R0
 
     # Placeholder curve
-    curve_a = 0.35
-    curve_b = -0.9
+    curve_a = 0.25
+    curve_b = -0.90
 
 class COMICSConverter(BaseGasSensorConverter):
 
