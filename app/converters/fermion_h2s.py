@@ -13,8 +13,8 @@ class FermionH2SConverter(BaseGasSensorConverter):
     rl_ohm = 10000.0
     vcc = 3.3
     default_r0 = get_calibrated_r0(SensorName.FERMION_H2S)
-    ratio_mode = RatioMode.R0_OVER_RS
+    ratio_mode = RatioMode.RS_OVER_R0
 
     # Placeholder curve; tune using clean-air and known-ppm calibration gas.
-    curve_a = 4.2
-    curve_b = -2.1
+    curve_a = 0.90
+    curve_b = -1.95
