@@ -33,8 +33,8 @@ class COMICSConverter(BaseGasSensorConverter):
 
     ratio_mode = RatioMode.RS_OVER_R0
     
-    curve_a = 8.5
-    curve_b = -1.95
+    curve_a = 2.5
+    curve_b = -1.4
         
 class NO2MICSConverter(BaseGasSensorConverter):
 
@@ -47,6 +47,6 @@ class NO2MICSConverter(BaseGasSensorConverter):
     default_r0 = get_calibrated_r0(SensorName.NO2)
 
     ratio_mode = RatioMode.RS_OVER_R0
-
-    curve_a = 7.8
-    curve_b = 0.97
+    
+    curve_a = 0.1
+    curve_b = 1.0
