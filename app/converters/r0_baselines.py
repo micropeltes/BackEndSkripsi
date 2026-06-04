@@ -10,13 +10,15 @@ logger = logging.getLogger(__name__)
 
 SAFE_FALLBACK_R0 = 10000.0
 
-CALIBRATED_R0_BY_SENSOR: dict[SensorName, float] = {
-    SensorName.MQ135: 103862.795332,
-    SensorName.NH3_MICS: 44434444.444444,
-    SensorName.CO: 1677763.71308,
-    SensorName.NO2: 14804814.814815,
-    SensorName.FERMION_NH3: 26499.377852,
-    SensorName.FERMION_H2S: 133478.26087,
+CALIBRATED_R0_BY_SENSOR = {
+    SensorName.MQ135: 100000.0,
+
+    SensorName.NH3_MICS: 300000.0,
+    SensorName.CO: 500000.0,
+    SensorName.NO2: 10000.0,
+
+    SensorName.FERMION_NH3: 30000.0,
+    SensorName.FERMION_H2S: 30000.0,
 }
 
 
