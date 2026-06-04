@@ -15,7 +15,7 @@ class NH3MICSConverter(BaseGasSensorConverter):
     vcc = 5.0
     default_r0 = get_calibrated_r0(SensorName.NH3_MICS)
 
-    ratio_mode = RatioMode.R0_OVER_RS
+    ratio_mode = RatioMode.RS_OVER_R0
 
     # Placeholder curve
     curve_a = 0.97
@@ -31,7 +31,7 @@ class COMICSConverter(BaseGasSensorConverter):
     vcc = 5.0
     default_r0 = get_calibrated_r0(SensorName.CO)
 
-    ratio_mode = RatioMode.R0_OVER_RS
+    ratio_mode = RatioMode.RS_OVER_R0
     
     curve_a = 8.5
     curve_b = -1.95
