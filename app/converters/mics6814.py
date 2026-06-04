@@ -11,7 +11,7 @@ class NH3MICSConverter(BaseGasSensorConverter):
     def sensor_name(self) -> SensorName:
         return SensorName.NH3_MICS
 
-    rl_ohm = 10000.0
+    rl_ohm = 27
     vcc = 5.0
     default_r0 = get_calibrated_r0(SensorName.NH3_MICS)
 
@@ -27,7 +27,7 @@ class COMICSConverter(BaseGasSensorConverter):
     def sensor_name(self) -> SensorName:
         return SensorName.CO
 
-    rl_ohm = 10000.0
+    rl_ohm = 130
     vcc = 5.0
     default_r0 = get_calibrated_r0(SensorName.CO)
 
@@ -42,7 +42,7 @@ class NO2MICSConverter(BaseGasSensorConverter):
     def sensor_name(self) -> SensorName:
         return SensorName.NO2
 
-    rl_ohm = 10000.0
+    rl_ohm = 820
     vcc = 5.0
     default_r0 = get_calibrated_r0(SensorName.NO2)
 

@@ -10,7 +10,7 @@ class FermionNH3Converter(BaseGasSensorConverter):
     def sensor_name(self) -> SensorName:
         return SensorName.FERMION_NH3
 
-    rl_ohm = 10000.0
+    rl_ohm = 1000000.0
     vcc = 3.3
     default_r0 = get_calibrated_r0(SensorName.FERMION_NH3)
     ratio_mode = RatioMode.RS_OVER_R0
