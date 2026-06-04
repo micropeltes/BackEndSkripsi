@@ -16,5 +16,5 @@ class FermionNH3Converter(BaseGasSensorConverter):
     ratio_mode = RatioMode.R0_OVER_RS
 
     # Placeholder curve; tune using clean-air and known-ppm calibration gas.
-    curve_a = 10.0
-    curve_b = 1.2
+    curve_a = 12.5
+    curve_b = -1.65

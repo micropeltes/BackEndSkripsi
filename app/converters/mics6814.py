@@ -18,9 +18,9 @@ class NH3MICSConverter(BaseGasSensorConverter):
     ratio_mode = RatioMode.RS_OVER_R0
 
     # Placeholder curve
-    curve_a = 70.0
-    curve_b = -1.8
-    
+    curve_a = 0.75
+    curve_b = -1.45
+
 class COMICSConverter(BaseGasSensorConverter):
 
     @property
@@ -33,9 +33,9 @@ class COMICSConverter(BaseGasSensorConverter):
 
     ratio_mode = RatioMode.RS_OVER_R0
 
-    curve_a = 50.0
-    curve_b = -1.5
-    
+    curve_a = 5.8
+    curve_b = -2.25
+        
 class NO2MICSConverter(BaseGasSensorConverter):
 
     @property
@@ -48,5 +48,5 @@ class NO2MICSConverter(BaseGasSensorConverter):
 
     ratio_mode = RatioMode.RS_OVER_R0
 
-    curve_a = 10.0
-    curve_b = -1.0
+    curve_a = 0.35
+    curve_b = 1.35
