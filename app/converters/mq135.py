@@ -16,5 +16,5 @@ class MQ135Converter(BaseGasSensorConverter):
     ratio_mode = RatioMode.RS_OVER_R0
 
     # Default curve placeholder (must be tuned with your lab calibration data).
-    curve_a = 95.0
-    curve_b = -2.15
+    curve_a = 102
+    curve_b = -2.48
