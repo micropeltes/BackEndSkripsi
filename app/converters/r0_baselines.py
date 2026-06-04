@@ -15,8 +15,7 @@ CALIBRATED_R0_BY_SENSOR = {
 
     SensorName.NH3_MICS: 300000.0,
     SensorName.CO: 500000.0,
-    SensorName.NO2: 10000.0,
-
+    SensorName.NO2: 20000,
     SensorName.FERMION_NH3: 9000000,
     SensorName.FERMION_H2S: 30000.0,
 }
