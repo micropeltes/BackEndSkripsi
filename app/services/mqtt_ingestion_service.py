@@ -88,11 +88,12 @@ class AsyncMqttIngestionService:
             logger.info("MQTT ingestion disabled by MQTT_ENABLED=false")
             return
 
+        sensor_topics = self._split_topics(self.settings.mqtt_sensor_topic)
         logger.info(
-            "Connecting MQTT broker %s:%s topic=%s auth=%s ca_cert=%s",
+            "Connecting MQTT broker %s:%s topics=%s auth=%s ca_cert=%s",
             self.settings.mqtt_broker,
             self.settings.mqtt_port,
-            self.settings.mqtt_sensor_topic,
+            ", ".join(sensor_topics),
             bool(self.settings.mqtt_username and self.settings.mqtt_password),
             self.settings.mqtt_ca_cert,
         )
@@ -146,14 +147,16 @@ class AsyncMqttIngestionService:
         self._connected = True
         self._last_error = None
 
-        topics: list[tuple[str, int]] = [
-            (self.settings.mqtt_sensor_topic, self.settings.mqtt_qos),
-            (self.settings.mqtt_timestamp_topic, self.settings.mqtt_qos),
+        topic_names = [
+            *self._split_topics(self.settings.mqtt_sensor_topic),
+            *self._split_topics(self.settings.mqtt_timestamp_topic),
+            *self._split_topics(self.settings.mqtt_timestamp_topic_legacy),
+            *self._split_topics(self.settings.mqtt_legacy_topic),
         ]
-        if self.settings.mqtt_timestamp_topic_legacy:
-            topics.append((self.settings.mqtt_timestamp_topic_legacy, self.settings.mqtt_qos))
-        if self.settings.mqtt_legacy_topic:
-            topics.append((self.settings.mqtt_legacy_topic, self.settings.mqtt_qos))
+        topics: list[tuple[str, int]] = [
+            (topic, self.settings.mqtt_qos)
+            for topic in dict.fromkeys(topic_names)
+        ]
 
         self.client.subscribe(topics)
         self._subscribed_topics = [topic for topic, _ in topics]
@@ -174,14 +177,17 @@ class AsyncMqttIngestionService:
                 return
 
             topic = msg.topic
-            is_timestamp_topic = topic == self.settings.mqtt_timestamp_topic
-            if self.settings.mqtt_timestamp_topic_legacy:
-                is_timestamp_topic = is_timestamp_topic or topic == self.settings.mqtt_timestamp_topic_legacy
+            timestamp_topics = {
+                *self._split_topics(self.settings.mqtt_timestamp_topic),
+                *self._split_topics(self.settings.mqtt_timestamp_topic_legacy),
+            }
+            is_timestamp_topic = topic in timestamp_topics
 
             if is_timestamp_topic:
                 self._cache_device_timestamp(raw_payload)
                 return
 
+            raw_payload.setdefault("_mqtt_topic", topic)
             self._merge_cached_timestamp(raw_payload)
             parsed = MqttRawPayload.model_validate(raw_payload)
             self._enqueue_payload_threadsafe(parsed)
@@ -284,6 +290,12 @@ class AsyncMqttIngestionService:
             return int(reason_code)
         except (TypeError, ValueError):
             return reason_code
+
+    @staticmethod
+    def _split_topics(value: str | None) -> list[str]:
+        if value is None:
+            return []
+        return [topic.strip() for topic in value.split(",") if topic.strip()]
 
     @staticmethod
     def _utc_now() -> str:
