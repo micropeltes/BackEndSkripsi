@@ -7,7 +7,8 @@ from sqlalchemy.orm import Session
 
 from app.converters.registry import SensorConverterRegistry
 from app.core.config import Settings
-from app.schemas.mqtt import MqttRawPayload
+from app.models import ErrorLog
+from app.schemas.mqtt import MqttErrorPayload, MqttRawPayload
 from app.services.calibration_service import CalibrationService
 from app.services.conversion_service import ConversionService
 from app.services.raw_acquisition_service import RawAcquisitionService
@@ -75,3 +76,17 @@ class SensorPipelineService:
             db.commit()
 
         return saved_count
+
+    def process_error_payload(self, payload: MqttErrorPayload) -> int:
+        with self.session_factory() as db:
+            db.add(
+                ErrorLog(
+                    device_id=payload.device_id,
+                    error=payload.error,
+                    payload_timestamp_ms=payload.timestamp_ms,
+                    received_timestamp_ms=now_ms(),
+                )
+            )
+            db.commit()
+
+        return 1

@@ -27,6 +27,7 @@ def mqtt_health_check(request: Request) -> dict[str, object]:
             "broker": settings.mqtt_broker,
             "port": settings.mqtt_port,
             "topic": settings.mqtt_sensor_topic,
+            "error_topic": settings.mqtt_error_topic,
             "ca_cert": settings.mqtt_ca_cert,
             "auth_configured": bool(settings.mqtt_username and settings.mqtt_password),
             "startup_error": startup_error,

@@ -66,7 +66,8 @@ class Settings(BaseModel):
     mqtt_enabled: bool = True
     mqtt_broker: str | None = None
     mqtt_port: int = 8883
-    mqtt_sensor_topic: str = "test/topic"
+    mqtt_sensor_topic: str = "device/data"
+    mqtt_error_topic: str | None = "device/error"
     mqtt_timestamp_topic: str = "device/timestamp"
     mqtt_timestamp_topic_legacy: str | None = "device/timestmap"
     mqtt_legacy_topic: str | None = None
@@ -112,7 +113,8 @@ class Settings(BaseModel):
             mqtt_enabled=mqtt_enabled,
             mqtt_broker=broker,
             mqtt_port=int(os.getenv("MQTT_PORT", "8883")),
-            mqtt_sensor_topic=os.getenv("MQTT_SENSOR_TOPIC", os.getenv("MQTT_TOPIC", "test/topic")),
+            mqtt_sensor_topic=os.getenv("MQTT_SENSOR_TOPIC", os.getenv("MQTT_TOPIC", "device/data")),
+            mqtt_error_topic=os.getenv("MQTT_ERROR_TOPIC", "device/error"),
             mqtt_timestamp_topic=os.getenv("MQTT_TIMESTAMP_TOPIC", "device/timestamp"),
             mqtt_timestamp_topic_legacy=os.getenv("MQTT_TIMESTAMP_TOPIC_LEGACY", "device/timestmap"),
             mqtt_legacy_topic=os.getenv("MQTT_LEGACY_TOPIC"),

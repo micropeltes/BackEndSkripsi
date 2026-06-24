@@ -7,15 +7,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 import queue
 import threading
+from typing import Literal, TypeAlias
 
 import paho.mqtt.client as mqtt
 
 from app.core.config import Settings
-from app.schemas.mqtt import MqttRawPayload
+from app.schemas.mqtt import MqttErrorPayload, MqttRawPayload
 from app.services.sensor_pipeline_service import SensorPipelineService
 
 
 logger = logging.getLogger(__name__)
+MqttQueueItem: TypeAlias = (
+    tuple[Literal["data"], MqttRawPayload]
+    | tuple[Literal["error"], MqttErrorPayload]
+)
 
 
 class AsyncMqttIngestionService:
@@ -28,7 +33,9 @@ class AsyncMqttIngestionService:
         self.settings = settings
         self.pipeline_service = pipeline_service
 
-        self._queue: queue.Queue[MqttRawPayload | None] = queue.Queue(maxsize=settings.mqtt_queue_size)
+        self._queue: queue.Queue[MqttQueueItem | None] = queue.Queue(
+            maxsize=settings.mqtt_queue_size
+        )
         self._stop_event = threading.Event()
         self._worker_thread: threading.Thread | None = None
 
@@ -42,6 +49,7 @@ class AsyncMqttIngestionService:
         self._queued_payloads = 0
         self._processed_payloads = 0
         self._saved_readings = 0
+        self._saved_errors = 0
         self._dropped_payloads = 0
 
         self.client = mqtt.Client(client_id=settings.mqtt_client_id)
@@ -77,6 +85,7 @@ class AsyncMqttIngestionService:
             "queued_payloads": self._queued_payloads,
             "processed_payloads": self._processed_payloads,
             "saved_readings": self._saved_readings,
+            "saved_errors": self._saved_errors,
             "dropped_payloads": self._dropped_payloads,
             "last_message_at": self._last_message_at,
             "last_processed_at": self._last_processed_at,
@@ -89,11 +98,12 @@ class AsyncMqttIngestionService:
             return
 
         sensor_topics = self._split_topics(self.settings.mqtt_sensor_topic)
+        error_topics = self._split_topics(self.settings.mqtt_error_topic)
         logger.info(
             "Connecting MQTT broker %s:%s topics=%s auth=%s ca_cert=%s",
             self.settings.mqtt_broker,
             self.settings.mqtt_port,
-            ", ".join(sensor_topics),
+            ", ".join([*sensor_topics, *error_topics]),
             bool(self.settings.mqtt_username and self.settings.mqtt_password),
             self.settings.mqtt_ca_cert,
         )
@@ -149,6 +159,7 @@ class AsyncMqttIngestionService:
 
         topic_names = [
             *self._split_topics(self.settings.mqtt_sensor_topic),
+            *self._split_topics(self.settings.mqtt_error_topic),
             *self._split_topics(self.settings.mqtt_timestamp_topic),
             *self._split_topics(self.settings.mqtt_timestamp_topic_legacy),
             *self._split_topics(self.settings.mqtt_legacy_topic),
@@ -181,7 +192,9 @@ class AsyncMqttIngestionService:
                 *self._split_topics(self.settings.mqtt_timestamp_topic),
                 *self._split_topics(self.settings.mqtt_timestamp_topic_legacy),
             }
+            error_topics = set(self._split_topics(self.settings.mqtt_error_topic))
             is_timestamp_topic = topic in timestamp_topics
+            is_error_topic = topic in error_topics
 
             if is_timestamp_topic:
                 self._cache_device_timestamp(raw_payload)
@@ -189,8 +202,14 @@ class AsyncMqttIngestionService:
 
             raw_payload.setdefault("_mqtt_topic", topic)
             self._merge_cached_timestamp(raw_payload)
+
+            if is_error_topic:
+                parsed_error = MqttErrorPayload.model_validate(raw_payload)
+                self._enqueue_payload_threadsafe(("error", parsed_error))
+                return
+
             parsed = MqttRawPayload.model_validate(raw_payload)
-            self._enqueue_payload_threadsafe(parsed)
+            self._enqueue_payload_threadsafe(("data", parsed))
         except json.JSONDecodeError:
             self._last_error = "Skipping MQTT message: invalid JSON"
             logger.warning("%s", self._last_error)
@@ -241,7 +260,7 @@ class AsyncMqttIngestionService:
         if cached is not None:
             raw_payload["timestamp_ms"] = cached
 
-    def _enqueue_payload_threadsafe(self, payload: MqttRawPayload) -> None:
+    def _enqueue_payload_threadsafe(self, payload: MqttQueueItem) -> None:
         if self._stop_event.is_set():
             return
 
@@ -266,16 +285,27 @@ class AsyncMqttIngestionService:
                 break
 
             try:
-                saved = self.pipeline_service.process_payload(payload)
+                message_type, parsed_payload = payload
+                if message_type == "error":
+                    saved = self.pipeline_service.process_error_payload(parsed_payload)
+                    self._saved_errors += saved
+                    log_context = (
+                        "Processed MQTT error payload | device=%s saved=%s",
+                        parsed_payload.device_id,
+                        saved,
+                    )
+                else:
+                    saved = self.pipeline_service.process_payload(parsed_payload)
+                    self._saved_readings += saved
+                    log_context = (
+                        "Processed MQTT payload | device=%s saved=%s sensors=%s",
+                        parsed_payload.device_id,
+                        saved,
+                        len(parsed_payload.adc),
+                    )
                 self._processed_payloads += 1
-                self._saved_readings += saved
                 self._last_processed_at = self._utc_now()
-                logger.info(
-                    "Processed MQTT payload | device=%s saved=%s sensors=%s",
-                    payload.device_id,
-                    saved,
-                    len(payload.adc),
-                )
+                logger.info(*log_context)
             except Exception as exc:
                 self._last_error = str(exc)
                 logger.exception("MQTT payload processing failed: %s", exc)

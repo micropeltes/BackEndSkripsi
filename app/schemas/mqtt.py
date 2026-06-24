@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import re
 
-from pydantic import AliasChoices, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 from app.utils.sensor_types import SensorName
 
@@ -123,14 +130,39 @@ class EnvironmentPayload(BaseModel):
     humidity_pct: float | None = None
 
 
+def _normalize_timestamp_ms(value: object) -> int | None:
+    if value is None or isinstance(value, bool):
+        return None
+
+    try:
+        parsed_timestamp = int(float(str(value).strip()))
+    except (TypeError, ValueError):
+        return None
+
+    # Device payloads may send Unix seconds or milliseconds.
+    if parsed_timestamp < 1_000_000_000_000:
+        parsed_timestamp *= 1000
+
+    return parsed_timestamp
+
+
 class MqttRawPayload(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     device_id: str = Field(
-        validation_alias=AliasChoices("device_id", "devid", "deviceId", "deviceID", "device"),
+        validation_alias=AliasChoices(
+            "device_id",
+            "devid",
+            "deviceId",
+            "deviceID",
+            "device",
+        ),
         min_length=1,
     )
-    timestamp_ms: int | None = Field(default=None, validation_alias=AliasChoices("timestamp_ms", "timestamp"))
+    timestamp_ms: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("timestamp_ms", "timestamp"),
+    )
     adc: dict[SensorName, int] = Field(default_factory=dict)
     environment: EnvironmentPayload | None = None
 
@@ -172,6 +204,36 @@ class MqttRawPayload(BaseModel):
         if not value:
             raise ValueError("ADC payload is empty.")
         return value
+
+    @field_validator("timestamp_ms", mode="before")
+    @classmethod
+    def normalize_payload_timestamp(cls, value: object) -> int | None:
+        return _normalize_timestamp_ms(value)
+
+
+class MqttErrorPayload(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    device_id: str = Field(
+        validation_alias=AliasChoices(
+            "device_id",
+            "devid",
+            "deviceId",
+            "deviceID",
+            "device",
+        ),
+        min_length=1,
+    )
+    timestamp_ms: int | None = Field(
+        default=None,
+        validation_alias=AliasChoices("timestamp_ms", "timestamp"),
+    )
+    error: str = Field(min_length=1)
+
+    @field_validator("timestamp_ms", mode="before")
+    @classmethod
+    def normalize_payload_timestamp(cls, value: object) -> int | None:
+        return _normalize_timestamp_ms(value)
 
 
 class RawSensorSample(BaseModel):
