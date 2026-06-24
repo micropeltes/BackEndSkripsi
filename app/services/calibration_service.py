@@ -50,7 +50,7 @@ class CalibrationService:
         )
 
         return CalibrationProfile(
-            r0=converter.default_r0,
+            r0=calibration.r0,
             rl_ohm=calibration.rl_ohm if calibration.rl_ohm is not None else converter.rl_ohm,
             vcc=calibration.vcc if calibration.vcc is not None else converter.vcc,
             ratio_mode=ratio_mode,

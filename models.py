@@ -1,3 +1,3 @@
-from app.models import Base, SensorCalibration, SensorData, SensorReading
+from app.models import Base, ErrorLog, SensorCalibration, SensorData, SensorReading
 
-__all__ = ["Base", "SensorData", "SensorReading", "SensorCalibration"]
+__all__ = ["Base", "ErrorLog", "SensorData", "SensorReading", "SensorCalibration"]
