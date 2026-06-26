@@ -65,6 +65,37 @@ class SensorReadingService:
         limit: int,
         device_id: str | None = None,
     ) -> list[SensorSnapshot]:
+        return self._get_grouped_rows(
+            limit=limit,
+            device_id=device_id,
+            operation_name="fetch latest sensor readings",
+        )
+
+    def get_rows_by_created_at_range(
+        self,
+        *,
+        start_time: datetime,
+        end_time: datetime,
+        limit: int,
+        device_id: str | None = None,
+    ) -> list[SensorSnapshot]:
+        return self._get_grouped_rows(
+            limit=limit,
+            device_id=device_id,
+            start_time=start_time,
+            end_time=end_time,
+            operation_name="fetch sensor readings by created_at range",
+        )
+
+    def _get_grouped_rows(
+        self,
+        *,
+        limit: int,
+        device_id: str | None = None,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
+        operation_name: str,
+    ) -> list[SensorSnapshot]:
         recent_groups_query = self.db.query(
             SensorReading.device_id.label("device_id"),
             SensorReading.received_timestamp_ms.label("received_timestamp_ms"),
@@ -73,6 +104,14 @@ class SensorReadingService:
         if device_id:
             recent_groups_query = recent_groups_query.filter(
                 SensorReading.device_id == device_id
+            )
+        if start_time is not None:
+            recent_groups_query = recent_groups_query.filter(
+                SensorReading.created_at >= start_time
+            )
+        if end_time is not None:
+            recent_groups_query = recent_groups_query.filter(
+                SensorReading.created_at <= end_time
             )
 
         recent_groups = (
@@ -109,7 +148,7 @@ class SensorReadingService:
         rows = run_read_with_db_retry(
             self.db,
             fetch_rows,
-            operation_name="fetch latest sensor readings",
+            operation_name=operation_name,
         )
 
         snapshots = self._build_snapshots(rows=rows, limit=limit)
