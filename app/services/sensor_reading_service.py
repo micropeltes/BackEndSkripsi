@@ -68,7 +68,6 @@ class SensorReadingService:
         return self._get_grouped_rows(
             limit=limit,
             device_id=device_id,
-            operation_name="fetch latest sensor readings",
         )
 
     def get_rows_by_created_at_range(
@@ -84,7 +83,6 @@ class SensorReadingService:
             device_id=device_id,
             start_time=start_time,
             end_time=end_time,
-            operation_name="fetch sensor readings by created_at range",
         )
 
     def _get_grouped_rows(
@@ -94,7 +92,6 @@ class SensorReadingService:
         device_id: str | None = None,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
-        operation_name: str,
     ) -> list[SensorSnapshot]:
         recent_groups_query = self.db.query(
             SensorReading.device_id.label("device_id"),

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, Path, Query
+from fastapi import APIRouter, Depends, HTTPException, Path, Query
 
 from app.converters.registry import SensorConverterRegistry
 from app.core.config import Settings
@@ -100,7 +100,7 @@ def _processed_to_record(
 
 def _build_historical_processed_response(
     *,
-    rows: list[SensorSnapshot],
+    rows: list[object],
     settings: Settings,
     registry: SensorConverterRegistry,
     calibration_service: CalibrationService,
@@ -144,7 +144,7 @@ def _build_historical_processed_response(
                     )
                 )
 
-            except NotFoundError:
+            except Exception:
                 continue
 
         items.append(
@@ -367,8 +367,9 @@ def list_sensor_history_by_time(
     ),
 ) -> SensorHistoricalProcessedResponse:
     if end_time < start_time:
-        raise ValidationError(
-            "end_time must be greater than or equal to start_time."
+        raise HTTPException(
+            status_code=422,
+            detail="end_time must be greater than or equal to start_time.",
         )
 
     rows = reading_service.get_rows_by_created_at_range(
