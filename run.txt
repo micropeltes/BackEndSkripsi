@@ -14,3 +14,6 @@ latest processed mq135
 GET http://127.0.0.1:8000/api/v1/sensors/mq135/latest?device_id=esp32c3-01
 
 mosquitto_sub -h localhost -p 8883 --cafile /etc/mosquitto/certs/ca.crt -u USERNAME -P PASSWORD -t '#' -v
+
+history processed by created_at range
+GET http://127.0.0.1:8000/api/v1/sensors/history?device_id=esp32c3-01&start_time=2026-06-26T00:00:00Z&end_time=2026-06-26T23:59:59Z&limit=1000
