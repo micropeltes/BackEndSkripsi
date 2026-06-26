@@ -25,6 +25,11 @@ class ConversionError(AppError):
     error_code = "conversion_error"
 
 
+class ValidationError(AppError):
+    status_code = 422
+    error_code = "validation_error"
+
+
 class NotFoundError(AppError):
     status_code = 404
     error_code = "not_found"

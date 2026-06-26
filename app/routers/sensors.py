@@ -24,8 +24,8 @@ from app.schemas.sensor import (
     SensorReadingRecordResponse,
 )
 from app.services.calibration_service import CalibrationService
-from app.services.sensor_reading_service import SensorReadingService
-from app.utils.errors import NotFoundError
+from app.services.sensor_reading_service import SensorReadingService, SensorSnapshot
+from app.utils.errors import NotFoundError, ValidationError
 from app.utils.sensor_types import SensorName
 
 
