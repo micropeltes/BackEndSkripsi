@@ -4,13 +4,19 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 TRUE_VALUES = {"1", "true", "yes", "on"}
 FALSE_VALUES = {"0", "false", "no", "off"}
 TRUE_ALIAS_VALUES = {"debug", "dev", "development"}
 FALSE_ALIAS_VALUES = {"release", "prod", "production"}
+
+
+def _split_csv(value: str | None) -> list[str]:
+    if value is None:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
 
 
 def load_dotenv(dotenv_path: str = ".env") -> None:
@@ -56,6 +62,8 @@ class Settings(BaseModel):
     app_name: str = "Electronic Nose Backend"
     api_prefix: str = "/api/v1"
     debug: bool = False
+    cors_allow_origins: list[str] = Field(default_factory=list)
+    cors_allow_credentials: bool = False
 
     database_url: str
     db_pool_size: int = Field(default=10, ge=1)
@@ -72,6 +80,7 @@ class Settings(BaseModel):
     mqtt_timestamp_topic_legacy: str | None = "device/timestmap"
     mqtt_legacy_topic: str | None = None
     mqtt_ca_cert: str | None = None
+    mqtt_tls_insecure: bool = False
     mqtt_username: str | None = None
     mqtt_password: str | None = None
     mqtt_client_id: str = "e-nose-backend"
@@ -83,6 +92,14 @@ class Settings(BaseModel):
     ads1115_min_adc: int = 0
     ads1115_max_adc: int = 32767
     filter_window_size: int = Field(default=5, ge=1, le=100)
+
+    @model_validator(mode="after")
+    def validate_cors_credentials(self) -> "Settings":
+        if self.cors_allow_credentials and "*" in self.cors_allow_origins:
+            raise ValueError(
+                "CORS_ALLOW_CREDENTIALS=true cannot be used with wildcard CORS_ALLOW_ORIGINS"
+            )
+        return self
 
     @field_validator("mqtt_qos")
     @classmethod
@@ -105,6 +122,8 @@ class Settings(BaseModel):
 
         return cls(
             debug=_parse_bool("DEBUG", False),
+            cors_allow_origins=_split_csv(os.getenv("CORS_ALLOW_ORIGINS")),
+            cors_allow_credentials=_parse_bool("CORS_ALLOW_CREDENTIALS", False),
             database_url=_required_env("DATABASE_URL"),
             db_pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
             db_max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "20")),
@@ -119,6 +138,7 @@ class Settings(BaseModel):
             mqtt_timestamp_topic_legacy=os.getenv("MQTT_TIMESTAMP_TOPIC_LEGACY", "device/timestmap"),
             mqtt_legacy_topic=os.getenv("MQTT_LEGACY_TOPIC"),
             mqtt_ca_cert=ca_cert,
+            mqtt_tls_insecure=_parse_bool("MQTT_TLS_INSECURE", False),
             mqtt_username=os.getenv("MQTT_USERNAME", os.getenv("MQTT_USER")),
             mqtt_password=os.getenv("MQTT_PASSWORD", os.getenv("MQTT_PASS")),
             mqtt_client_id=os.getenv("MQTT_CLIENT_ID", "e-nose-backend"),

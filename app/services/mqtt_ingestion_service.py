@@ -62,7 +62,7 @@ class AsyncMqttIngestionService:
             if not ca_cert_path.exists():
                 raise FileNotFoundError(f"MQTT_CA_CERT does not exist: {settings.mqtt_ca_cert}")
             self.client.tls_set(ca_certs=settings.mqtt_ca_cert)
-            self.client.tls_insecure_set(True)
+            self.client.tls_insecure_set(settings.mqtt_tls_insecure)
 
         if settings.mqtt_username and settings.mqtt_password:
             self.client.username_pw_set(settings.mqtt_username, settings.mqtt_password)
@@ -73,12 +73,13 @@ class AsyncMqttIngestionService:
         return {
             "enabled": self.settings.mqtt_enabled,
             "connected": self._connected,
-            "broker": self.settings.mqtt_broker,
+            "broker_configured": bool(self.settings.mqtt_broker),
             "port": self.settings.mqtt_port,
-            "client_id": self.settings.mqtt_client_id,
+            "client_id_configured": bool(self.settings.mqtt_client_id),
             "auth_configured": bool(self.settings.mqtt_username and self.settings.mqtt_password),
-            "ca_cert": self.settings.mqtt_ca_cert,
-            "subscribed_topics": self._subscribed_topics,
+            "tls_configured": bool(self.settings.mqtt_ca_cert),
+            "tls_insecure": self.settings.mqtt_tls_insecure,
+            "subscribed_topic_count": len(self._subscribed_topics),
             "queue_size": self._queue.qsize(),
             "queue_max_size": self.settings.mqtt_queue_size,
             "received_messages": self._received_messages,
@@ -105,7 +106,7 @@ class AsyncMqttIngestionService:
             self.settings.mqtt_port,
             ", ".join([*sensor_topics, *error_topics]),
             bool(self.settings.mqtt_username and self.settings.mqtt_password),
-            self.settings.mqtt_ca_cert,
+            bool(self.settings.mqtt_ca_cert),
         )
 
         self._stop_event.clear()

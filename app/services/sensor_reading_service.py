@@ -145,7 +145,7 @@ class SensorReadingService:
         rows = run_read_with_db_retry(
             self.db,
             fetch_rows,
-            operation_name=operation_name,
+            operation_name="fetch grouped sensor readings",
         )
 
         snapshots = self._build_snapshots(rows=rows, limit=limit)
