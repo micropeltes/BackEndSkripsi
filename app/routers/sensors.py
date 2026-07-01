@@ -24,6 +24,7 @@ from app.schemas.sensor import (
     SensorReadingRecordResponse,
 )
 from app.services.calibration_service import CalibrationService
+from app.services.sensor_payload_service import build_latest_sensor_payload
 from app.services.sensor_reading_service import SensorReadingService, SensorSnapshot
 from app.utils.errors import NotFoundError, ValidationError
 from app.utils.sensor_types import SensorName
@@ -34,6 +35,14 @@ router = APIRouter(prefix="/sensors", tags=["sensors"])
 
 def _round(value: float) -> float:
     return round(value, 6)
+
+
+def _normalize_device_id(device_id: str | None) -> str | None:
+    if device_id is None:
+        return None
+
+    normalized = device_id.strip()
+    return normalized or None
 
 
 def _convert_adc_to_processed(
@@ -181,7 +190,6 @@ def get_latest_sensor_data(
     sensor: SensorName,
     device_id: str | None = Query(
         default=None,
-        min_length=1,
         max_length=64,
     ),
     reading_service: SensorReadingService = Depends(
@@ -197,6 +205,7 @@ def get_latest_sensor_data(
         get_calibration_service
     ),
 ) -> SensorProcessedResponse:
+    device_id = _normalize_device_id(device_id)
     row = reading_service.get_latest_row(
         device_id=device_id
     )
@@ -224,7 +233,6 @@ def get_latest_sensor_data(
 def list_latest_sensor_data(
     device_id: str | None = Query(
         default=None,
-        min_length=1,
         max_length=64,
     ),
     sensor: SensorName | None = None,
@@ -241,6 +249,7 @@ def list_latest_sensor_data(
         get_calibration_service
     ),
 ) -> SensorListResponse:
+    device_id = _normalize_device_id(device_id)
     row = reading_service.get_latest_row(
         device_id=device_id
     )
@@ -302,7 +311,6 @@ def list_latest_sensor_rows(
     ),
     device_id: str | None = Query(
         default=None,
-        min_length=1,
         max_length=64,
     ),
     reading_service: SensorReadingService = Depends(
@@ -318,13 +326,10 @@ def list_latest_sensor_rows(
         get_calibration_service
     ),
 ) -> SensorHistoricalProcessedResponse:
-    rows = reading_service.get_latest_rows(
+    device_id = _normalize_device_id(device_id)
+    return build_latest_sensor_payload(
         limit=limit,
         device_id=device_id,
-    )
-
-    return _build_historical_processed_response(
-        rows=rows,
         settings=settings,
         registry=registry,
         calibration_service=calibration_service,
@@ -350,7 +355,6 @@ def list_sensor_history_by_time(
     ),
     device_id: str | None = Query(
         default=None,
-        min_length=1,
         max_length=64,
     ),
     reading_service: SensorReadingService = Depends(
@@ -366,18 +370,22 @@ def list_sensor_history_by_time(
         get_calibration_service
     ),
 ) -> SensorHistoricalProcessedResponse:
+    device_id = _normalize_device_id(device_id)
     if end_time < start_time:
         raise HTTPException(
             status_code=422,
             detail="end_time must be greater than or equal to start_time.",
         )
 
-    rows = reading_service.get_rows_by_created_at_range(
-        start_time=start_time,
-        end_time=end_time,
-        limit=limit,
-        device_id=device_id,
-    )
+    try:
+        rows = reading_service.get_rows_by_created_at_range(
+            start_time=start_time,
+            end_time=end_time,
+            limit=limit,
+            device_id=device_id,
+        )
+    except NotFoundError:
+        return SensorHistoricalProcessedResponse(count=0, items=[])
 
     return _build_historical_processed_response(
         rows=rows,
@@ -399,17 +407,20 @@ def list_latest_sensor_rows_unprocessed(
     ),
     device_id: str | None = Query(
         default=None,
-        min_length=1,
         max_length=64,
     ),
     reading_service: SensorReadingService = Depends(
         get_sensor_reading_service
     ),
 ) -> SensorDataListResponse:
-    rows = reading_service.get_latest_rows(
-        limit=limit,
-        device_id=device_id,
-    )
+    device_id = _normalize_device_id(device_id)
+    try:
+        rows = reading_service.get_latest_rows(
+            limit=limit,
+            device_id=device_id,
+        )
+    except NotFoundError:
+        return SensorDataListResponse(count=0, items=[])
 
     items = [
         SensorDataRecordResponse(

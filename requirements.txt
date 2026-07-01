@@ -1,5 +1,6 @@
 fastapi
 uvicorn
+websockets
 sqlalchemy
 paho-mqtt
 psycopg2-binary

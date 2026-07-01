@@ -12,7 +12,9 @@ from app.schemas.mqtt import MqttErrorPayload, MqttRawPayload
 from app.services.calibration_service import CalibrationService
 from app.services.conversion_service import ConversionService
 from app.services.raw_acquisition_service import RawAcquisitionService
+from app.services.sensor_payload_service import build_latest_sensor_payload
 from app.services.sensor_reading_service import SensorReadingService
+from app.services.websocket_manager import sensor_ws_manager
 from app.utils.errors import AppError
 from app.utils.filters import RollingAverageFilter
 from app.utils.time_utils import now_ms
@@ -74,6 +76,22 @@ class SensorPipelineService:
                     )
 
             db.commit()
+
+            if saved_count > 0:
+                latest_payload = build_latest_sensor_payload(
+                    limit=1000,
+                    device_id=None,
+                    settings=self.settings,
+                    registry=self.registry,
+                    calibration_service=calibration_service,
+                    reading_service=reading_service,
+                )
+                sensor_ws_manager.broadcast_json_threadsafe(
+                    {
+                        "type": "update",
+                        **latest_payload.model_dump(),
+                    }
+                )
 
         return saved_count
 

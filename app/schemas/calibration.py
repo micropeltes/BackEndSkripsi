@@ -7,9 +7,9 @@ from app.utils.sensor_types import RatioMode, SensorName
 
 class CalibrationUpsertRequest(BaseModel):
     device_id: str = Field(min_length=1, max_length=64)
-    r0: float = Field(gt=0)
-    rl_ohm: float | None = Field(default=None, gt=0)
-    vcc: float | None = Field(default=None, gt=0)
+    r0: float = Field(gt=0, le=1_000_000_000)
+    rl_ohm: float | None = Field(default=None, gt=0, le=1_000_000_000)
+    vcc: float | None = Field(default=None, gt=0, le=24)
     ratio_mode: RatioMode | None = None
 
 

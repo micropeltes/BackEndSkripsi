@@ -3,6 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 
 from app.core.dependencies import get_calibration_service
+from app.core.security import require_api_key
 from app.schemas.calibration import CalibrationResponse, CalibrationUpsertRequest
 from app.services.calibration_service import CalibrationService
 from app.utils.sensor_types import RatioMode, SensorName
@@ -15,6 +16,7 @@ router = APIRouter(prefix="/calibrations", tags=["calibrations"])
 def upsert_calibration(
     sensor: SensorName,
     payload: CalibrationUpsertRequest,
+    _: None = Depends(require_api_key),
     service: CalibrationService = Depends(get_calibration_service),
 ) -> CalibrationResponse:
     calibration = service.upsert(sensor=sensor, payload=payload)

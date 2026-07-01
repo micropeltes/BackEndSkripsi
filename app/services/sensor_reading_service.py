@@ -14,6 +14,10 @@ from app.utils.errors import NotFoundError
 from app.utils.sensor_types import SensorName
 
 
+HISTORY_FETCH_PAGE_MULTIPLIER = 8
+HISTORY_MAX_FETCH_PAGES = 10
+
+
 @dataclass
 class SensorSnapshot:
     id: int
@@ -78,12 +82,68 @@ class SensorReadingService:
         limit: int,
         device_id: str | None = None,
     ) -> list[SensorSnapshot]:
-        return self._get_grouped_rows(
+        return self._get_rows_by_created_at_range_fast(
             limit=limit,
             device_id=device_id,
             start_time=start_time,
             end_time=end_time,
         )
+
+    def _get_rows_by_created_at_range_fast(
+        self,
+        *,
+        start_time: datetime,
+        end_time: datetime,
+        limit: int,
+        device_id: str | None = None,
+    ) -> list[SensorSnapshot]:
+        page_size = max(limit * HISTORY_FETCH_PAGE_MULTIPLIER, limit)
+        offset = 0
+        rows: list[SensorReading] = []
+        snapshots: list[SensorSnapshot] = []
+
+        def fetch_page() -> list[SensorReading]:
+            query = self.db.query(SensorReading)
+            if device_id:
+                query = query.filter(SensorReading.device_id == device_id)
+
+            return (
+                query.filter(
+                    SensorReading.created_at >= start_time,
+                    SensorReading.created_at <= end_time,
+                )
+                .order_by(
+                    SensorReading.created_at.desc(),
+                    SensorReading.received_timestamp_ms.desc(),
+                    SensorReading.id.desc(),
+                )
+                .offset(offset)
+                .limit(page_size)
+                .all()
+            )
+
+        for _ in range(HISTORY_MAX_FETCH_PAGES):
+            page_rows = run_read_with_db_retry(
+                self.db,
+                fetch_page,
+                operation_name="fetch sensor readings by created_at range",
+            )
+            if not page_rows:
+                break
+
+            rows.extend(page_rows)
+            snapshots = self._build_snapshots(rows=rows, limit=limit)
+            if len(snapshots) >= limit or len(page_rows) < page_size:
+                break
+
+            offset += page_size
+
+        if not snapshots:
+            if device_id:
+                raise NotFoundError(f"No readings found for device '{device_id}'.")
+            raise NotFoundError("No readings found.")
+
+        return snapshots
 
     def _get_grouped_rows(
         self,
@@ -93,6 +153,10 @@ class SensorReadingService:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
     ) -> list[SensorSnapshot]:
+        operation_name = "fetch latest sensor readings"
+        if start_time is not None or end_time is not None:
+            operation_name = "fetch sensor readings by created_at range"
+
         recent_groups_query = self.db.query(
             SensorReading.device_id.label("device_id"),
             SensorReading.received_timestamp_ms.label("received_timestamp_ms"),

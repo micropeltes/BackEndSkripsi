@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import socket
 from functools import lru_cache
 from pathlib import Path
 
@@ -11,6 +12,15 @@ TRUE_VALUES = {"1", "true", "yes", "on"}
 FALSE_VALUES = {"0", "false", "no", "off"}
 TRUE_ALIAS_VALUES = {"debug", "dev", "development"}
 FALSE_ALIAS_VALUES = {"release", "prod", "production"}
+DEFAULT_CORS_ORIGINS = (
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+)
+
+
+def _default_mqtt_client_id() -> str:
+    hostname = socket.gethostname().split(".", 1)[0] or "host"
+    return f"e-nose-backend-{hostname}-{os.getpid()}"
 
 
 def load_dotenv(dotenv_path: str = ".env") -> None:
@@ -52,10 +62,35 @@ def _required_env(name: str) -> str:
     return value
 
 
+def _optional_env(name: str) -> str | None:
+    value = os.getenv(name)
+    if value is None:
+        return None
+
+    stripped = value.strip()
+    return stripped or None
+
+
+def _parse_csv_env(name: str, default: tuple[str, ...]) -> list[str]:
+    value = os.getenv(name)
+    if value is None:
+        return list(default)
+
+    items = [
+        item.strip()
+        for item in value.split(",")
+        if item.strip()
+    ]
+    return items or list(default)
+
+
 class Settings(BaseModel):
     app_name: str = "Electronic Nose Backend"
     api_prefix: str = "/api/v1"
     debug: bool = False
+    cors_origins: list[str] = Field(default_factory=lambda: list(DEFAULT_CORS_ORIGINS))
+    api_key: str | None = None
+    rate_limit_per_minute: int = Field(default=120, ge=0)
 
     database_url: str
     db_pool_size: int = Field(default=10, ge=1)
@@ -74,7 +109,7 @@ class Settings(BaseModel):
     mqtt_ca_cert: str | None = None
     mqtt_username: str | None = None
     mqtt_password: str | None = None
-    mqtt_client_id: str = "e-nose-backend"
+    mqtt_client_id: str = Field(default_factory=_default_mqtt_client_id)
     mqtt_qos: int = 0
     mqtt_keepalive: int = 60
     mqtt_queue_size: int = 1000
@@ -105,6 +140,9 @@ class Settings(BaseModel):
 
         return cls(
             debug=_parse_bool("DEBUG", False),
+            cors_origins=_parse_csv_env("CORS_ORIGINS", DEFAULT_CORS_ORIGINS),
+            api_key=_optional_env("API_KEY"),
+            rate_limit_per_minute=int(os.getenv("RATE_LIMIT_PER_MINUTE", "120")),
             database_url=_required_env("DATABASE_URL"),
             db_pool_size=int(os.getenv("DB_POOL_SIZE", "10")),
             db_max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "20")),
@@ -121,7 +159,7 @@ class Settings(BaseModel):
             mqtt_ca_cert=ca_cert,
             mqtt_username=os.getenv("MQTT_USERNAME", os.getenv("MQTT_USER")),
             mqtt_password=os.getenv("MQTT_PASSWORD", os.getenv("MQTT_PASS")),
-            mqtt_client_id=os.getenv("MQTT_CLIENT_ID", "e-nose-backend"),
+            mqtt_client_id=os.getenv("MQTT_CLIENT_ID", _default_mqtt_client_id()),
             mqtt_qos=int(os.getenv("MQTT_QOS", "0")),
             mqtt_keepalive=int(os.getenv("MQTT_KEEPALIVE", "60")),
             mqtt_queue_size=int(os.getenv("MQTT_QUEUE_SIZE", "1000")),

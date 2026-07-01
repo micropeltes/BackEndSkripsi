@@ -53,9 +53,9 @@ class SensorDataListResponse(BaseModel):
 class SensorConvertRequest(BaseModel):
     device_id: str = Field(min_length=1, max_length=64)
     sensor: SensorName
-    adc: int
-    temperature_c: float | None = None
-    humidity_pct: float | None = None
+    adc: int = Field(ge=0, le=32767)
+    temperature_c: float | None = Field(default=None, ge=-40, le=125)
+    humidity_pct: float | None = Field(default=None, ge=0, le=100)
 
 class SensorHistoricalProcessedSensorData(BaseModel):
     adc: int

@@ -78,10 +78,20 @@ def run_read_with_db_retry(
 def init_db() -> bool:
     try:
         Base.metadata.create_all(bind=engine)
-        for table in Base.metadata.sorted_tables:
-            for index in table.indexes:
-                index.create(bind=engine, checkfirst=True)
-        return True
     except SQLAlchemyError as exc:
         logger.exception("Database initialization error: %s", exc)
         return False
+
+    for table in Base.metadata.sorted_tables:
+        for index in table.indexes:
+            try:
+                index.create(bind=engine, checkfirst=True)
+            except SQLAlchemyError as exc:
+                logger.warning(
+                    "Skipping optional database index %s on table %s: %s",
+                    index.name,
+                    table.name,
+                    exc,
+                )
+
+    return True
